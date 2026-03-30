@@ -1611,20 +1611,39 @@
     document.querySelectorAll('.nav-item[data-nav]').forEach(function (item) {
       item.addEventListener('click', function () {
         UI.setActiveSection(item.dataset.nav);
-        // Clear search
         var searchInput = $('search-input');
         if (searchInput) searchInput.value = '';
+        // Close sidebar on mobile after navigation
+        var sb = $('sidebar');
+        var sbBd = $('sidebar-backdrop');
+        if (sb) sb.classList.remove('open');
+        if (sbBd) { sbBd.classList.remove('visible'); sbBd.hidden = true; }
       });
     });
 
-    // -- Sidebar toggle (mobile) --
+    // -- Sidebar toggle (mobile) with backdrop --
     var sidebarToggle = $('sidebar-toggle');
-    if (sidebarToggle) {
-      sidebarToggle.addEventListener('click', function () {
-        var sidebar = $('sidebar');
-        if (sidebar) sidebar.classList.toggle('open');
-      });
+    var sidebarEl = $('sidebar');
+    var sidebarBackdrop = $('sidebar-backdrop');
+
+    function toggleSidebar() {
+      if (!sidebarEl) return;
+      var isOpen = sidebarEl.classList.toggle('open');
+      if (sidebarBackdrop) {
+        sidebarBackdrop.hidden = !isOpen;
+        // Trigger reflow for transition
+        if (isOpen) { sidebarBackdrop.offsetHeight; sidebarBackdrop.classList.add('visible'); }
+        else { sidebarBackdrop.classList.remove('visible'); }
+      }
     }
+
+    function closeSidebar() {
+      if (sidebarEl) sidebarEl.classList.remove('open');
+      if (sidebarBackdrop) { sidebarBackdrop.classList.remove('visible'); sidebarBackdrop.hidden = true; }
+    }
+
+    if (sidebarToggle) sidebarToggle.addEventListener('click', toggleSidebar);
+    if (sidebarBackdrop) sidebarBackdrop.addEventListener('click', closeSidebar);
 
     // -- Upload button --
     var uploadBtn = $('upload-btn');
@@ -1844,6 +1863,27 @@
     if (zoomInBtn) zoomInBtn.addEventListener('click', function () { if (Viewer._zoom) Viewer._zoom.zoomIn(); });
     if (zoomOutBtn) zoomOutBtn.addEventListener('click', function () { if (Viewer._zoom) Viewer._zoom.zoomOut(); });
     if (zoomFitBtn) zoomFitBtn.addEventListener('click', function () { if (Viewer._zoom) Viewer._zoom.zoomFit(); });
+
+    // -- Mobile viewer action buttons (mirror desktop actions) --
+    var mobileDownload = $('viewer-mobile-download');
+    var mobileShare = $('viewer-mobile-share');
+    var mobileInfo = $('viewer-mobile-info');
+    var mobileMore = $('viewer-mobile-more');
+    if (mobileDownload) mobileDownload.addEventListener('click', function () {
+      if (Viewer.currentFile) FileOps.download(Viewer.currentFile.id);
+    });
+    if (mobileShare) mobileShare.addEventListener('click', function () {
+      if (Viewer.currentFile) FileOps.share(Viewer.currentFile.id);
+    });
+    if (mobileInfo) mobileInfo.addEventListener('click', function () {
+      var btn = $('viewer-info-btn');
+      if (btn) btn.click(); // Reuse the desktop info panel toggle
+    });
+    if (mobileMore) mobileMore.addEventListener('click', function () {
+      if (!Viewer.currentFile) return;
+      // Show context menu with remaining actions
+      ContextMenu.show(window.innerWidth / 2, window.innerHeight / 2, Viewer.currentFile);
+    });
 
     // -- Document info panel --
     var infoBtn = $('viewer-info-btn');

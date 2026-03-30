@@ -64,6 +64,9 @@
   <!-- ========== LAYOUT WRAPPER ========== -->
   <div class="app-layout" id="app-layout">
 
+    <!-- Sidebar backdrop (mobile only, click to close) -->
+    <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
+
     <!-- ========== LEFT SIDEBAR ========== -->
     <aside class="sidebar" id="sidebar">
       <nav class="sidebar-nav" aria-label="Main navigation">
@@ -527,6 +530,26 @@
       <div class="viewer-content" id="viewer-content">
         <!-- Document preview rendered here by JS -->
       </div>
+    </div>
+
+    <!-- Mobile action bar (shown only on small screens when topbar actions are hidden) -->
+    <div class="viewer-mobile-actions" id="viewer-mobile-actions">
+      <button class="viewer-mobile-btn" id="viewer-mobile-download" type="button" aria-label="Download">
+        <i data-lucide="download"></i>
+        <span>Download</span>
+      </button>
+      <button class="viewer-mobile-btn" id="viewer-mobile-share" type="button" aria-label="Share">
+        <i data-lucide="share-2"></i>
+        <span>Share</span>
+      </button>
+      <button class="viewer-mobile-btn" id="viewer-mobile-info" type="button" aria-label="Info">
+        <i data-lucide="info"></i>
+        <span>Info</span>
+      </button>
+      <button class="viewer-mobile-btn" id="viewer-mobile-more" type="button" aria-label="More actions">
+        <i data-lucide="more-horizontal"></i>
+        <span>More</span>
+      </button>
     </div>
 
     <!-- Bottom bar: file counter + zoom controls -->
