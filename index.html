@@ -168,44 +168,59 @@
 
     </main>
 
-    <!-- ========== RIGHT PREVIEW PANE ========== -->
-    <aside class="preview-panel" id="preview-panel" aria-label="File preview" hidden>
-      <div class="preview-header">
-        <h2 class="preview-filename" id="preview-filename">filename.ext</h2>
-        <button class="icon-btn" id="preview-close-btn" type="button" aria-label="Close preview">
-          <i data-lucide="x"></i>
-        </button>
-      </div>
-
-      <div class="preview-meta" id="preview-meta">
-        <!-- File metadata rendered by JS -->
-      </div>
-
-      <div class="preview-content" id="preview-content">
-        <!-- Preview rendered by JS (images, PDF, docx, etc.) -->
-      </div>
-
-      <div class="preview-actions">
-        <button class="btn btn-secondary" id="preview-download-btn" type="button">
-          <i data-lucide="download"></i>
-          <span>Download</span>
-        </button>
-        <button class="btn btn-secondary" id="preview-share-btn" type="button">
-          <i data-lucide="share-2"></i>
-          <span>Share</span>
-        </button>
-        <button class="btn btn-secondary" id="preview-edit-btn" type="button">
-          <i data-lucide="pencil"></i>
-          <span>Edit</span>
-        </button>
-        <button class="btn btn-danger" id="preview-delete-btn" type="button">
-          <i data-lucide="trash-2"></i>
-          <span>Delete</span>
-        </button>
-      </div>
-    </aside>
+    <!-- Preview panel removed — replaced by viewer modal -->
 
   </div><!-- /.app-layout -->
+
+  <!-- ========== DOCUMENT VIEWER MODAL ========== -->
+  <div class="modal-overlay viewer-overlay" id="viewer-modal" role="dialog" aria-modal="true" aria-labelledby="viewer-modal-title" hidden>
+    <div class="viewer-modal">
+      <div class="viewer-header">
+        <div class="viewer-header-left">
+          <button class="icon-btn" id="viewer-back-btn" type="button" aria-label="Close">
+            <i data-lucide="arrow-left"></i>
+          </button>
+          <div class="viewer-file-info">
+            <h2 class="viewer-filename" id="viewer-filename">filename.ext</h2>
+            <span class="viewer-meta" id="viewer-meta-brief"></span>
+          </div>
+        </div>
+        <div class="viewer-header-actions">
+          <button class="btn btn-secondary" id="viewer-edit-btn" type="button" title="Edit in browser">
+            <i data-lucide="pencil"></i>
+            <span>Edit</span>
+          </button>
+          <button class="btn btn-secondary" id="viewer-open-word-btn" type="button" title="Open in Microsoft Word">
+            <i data-lucide="external-link"></i>
+            <span>Open in Word</span>
+          </button>
+          <button class="btn btn-secondary" id="viewer-upload-version-btn" type="button" title="Upload new version">
+            <i data-lucide="upload"></i>
+            <span>New Version</span>
+          </button>
+          <button class="btn btn-primary" id="viewer-download-btn" type="button" title="Download">
+            <i data-lucide="download"></i>
+            <span>Download</span>
+          </button>
+          <div class="viewer-header-divider"></div>
+          <button class="btn btn-secondary" id="viewer-share-btn" type="button" title="Share">
+            <i data-lucide="share-2"></i>
+          </button>
+          <button class="btn btn-danger" id="viewer-delete-btn" type="button" title="Delete">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </div>
+      </div>
+      <div class="viewer-body">
+        <div class="viewer-content" id="viewer-content">
+          <!-- Document preview rendered here by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden file input for "Upload new version" -->
+  <input type="file" id="version-file-input" hidden>
 
   <!-- ========== SHARE MODAL ========== -->
   <div class="modal-overlay" id="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-modal-title" hidden>

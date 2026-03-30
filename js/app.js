@@ -427,7 +427,6 @@
     /** Attach click / dblclick / contextmenu to a file element. */
     _bindFileEvents(el, file) {
       var self = this;
-      // Single click — folders navigate in, files select
       el.addEventListener('click', function (e) {
         e.stopPropagation();
         if (file.type === 'folder') {
@@ -437,16 +436,13 @@
           self.renderFileList();
         } else {
           self.selectFile(file.id);
+          Viewer.open(file);
         }
       });
-      // Double click — open preview for files
+      // Double click — same behavior (prevents confusion)
       el.addEventListener('dblclick', function (e) {
         e.stopPropagation();
-        if (file.type !== 'folder') {
-          Preview.show(file);
-        }
       });
-      // Right click — context menu
       el.addEventListener('contextmenu', function (e) {
         e.preventDefault();
         e.stopPropagation();
@@ -1084,6 +1080,197 @@
   };
 
   // ---------------------------------------------------------------------------
+  // Document Viewer Modal
+  // ---------------------------------------------------------------------------
+
+  var Viewer = {
+    currentFile: null,
+
+    async open(file) {
+      this.currentFile = file;
+      var modal = $('viewer-modal');
+      var content = $('viewer-content');
+      var filename = $('viewer-filename');
+      var metaBrief = $('viewer-meta-brief');
+      if (!modal || !content) return;
+
+      // Set header info
+      if (filename) filename.textContent = file.name;
+      if (metaBrief) {
+        metaBrief.textContent = formatSize(file.size) + ' · ' + formatDate(file.modifiedAt);
+      }
+
+      // Show/hide action buttons based on file type
+      var ext = (file.name.split('.').pop() || '').toLowerCase();
+      var editBtn = $('viewer-edit-btn');
+      var openWordBtn = $('viewer-open-word-btn');
+      if (editBtn) editBtn.style.display = (ext === 'docx' || ext === 'doc') ? '' : 'none';
+      if (openWordBtn) openWordBtn.style.display = (ext === 'docx' || ext === 'doc') ? '' : 'none';
+
+      // Show loading state
+      content.innerHTML = '<div class="preview-loading"><i data-lucide="loader-2" class="spin"></i><span>Loading preview...</span></div>';
+      modal.hidden = false;
+      lucide.createIcons({ nodes: [content] });
+
+      // Store file ID on modal
+      modal.dataset.fileId = file.id;
+
+      try {
+        var data = await Storage.getData(file.id);
+        var ft = getFileType(file.name);
+
+        if (ft.category === 'document') {
+          await this.renderDocx(data, content);
+        } else if (ft.category === 'spreadsheet') {
+          await this.renderXlsx(data, content);
+        } else if (ft.category === 'pdf') {
+          await this.renderPdf(data, content);
+        } else if (ft.category === 'image') {
+          this.renderImage(data, file.mimeType, content);
+        } else if (ft.category === 'text') {
+          this.renderText(data, file.name, content);
+        } else {
+          this.renderUnsupported(file, content);
+        }
+      } catch (err) {
+        console.error('Viewer failed:', err);
+        content.innerHTML = '<div class="preview-unsupported"><h3>Preview failed</h3><p>Could not load the document preview.</p></div>';
+      }
+    },
+
+    close() {
+      var modal = $('viewer-modal');
+      if (modal) modal.hidden = true;
+      this.currentFile = null;
+    },
+
+    async renderDocx(arrayBuffer, container) {
+      if (typeof mammoth === 'undefined') {
+        container.innerHTML = '<div class="preview-unsupported"><h3>Preview unavailable</h3><p>Document viewer library not loaded.</p></div>';
+        return;
+      }
+      var result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+      container.innerHTML = '<div class="preview-docx">' + result.value + '</div>';
+    },
+
+    async renderXlsx(arrayBuffer, container) {
+      if (typeof XLSX === 'undefined') {
+        container.innerHTML = '<div class="preview-unsupported"><h3>Preview unavailable</h3><p>Spreadsheet viewer library not loaded.</p></div>';
+        return;
+      }
+      var workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      var firstSheet = workbook.SheetNames[0];
+      if (!firstSheet) {
+        container.innerHTML = '<div class="preview-unsupported"><h3>Empty spreadsheet</h3><p>No sheets found in this file.</p></div>';
+        return;
+      }
+      var html = XLSX.utils.sheet_to_html(workbook.Sheets[firstSheet]);
+      container.innerHTML = '<div class="preview-xlsx">' + html + '</div>';
+    },
+
+    async renderPdf(arrayBuffer, container) {
+      if (typeof pdfjsLib === 'undefined') {
+        container.innerHTML = '<div class="preview-unsupported"><h3>Preview unavailable</h3><p>PDF viewer library not loaded.</p></div>';
+        return;
+      }
+      container.innerHTML = '';
+      var wrapper = document.createElement('div');
+      wrapper.className = 'preview-pdf';
+      container.appendChild(wrapper);
+
+      var pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      for (var i = 1; i <= pdf.numPages; i++) {
+        var page = await pdf.getPage(i);
+        var viewport = page.getViewport({ scale: 1.5 });
+        var canvas = document.createElement('canvas');
+        canvas.className = 'pdf-page-canvas';
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        wrapper.appendChild(canvas);
+        await page.render({
+          canvasContext: canvas.getContext('2d'),
+          viewport: viewport
+        }).promise;
+      }
+    },
+
+    renderImage(arrayBuffer, mimeType, container) {
+      var blob = new Blob([arrayBuffer], { type: mimeType || 'image/png' });
+      var url = URL.createObjectURL(blob);
+      container.innerHTML = '<div class="preview-image"><img src="' + url + '" alt="Preview"></div>';
+    },
+
+    renderText(arrayBuffer, filename, container) {
+      var text = new TextDecoder('utf-8').decode(arrayBuffer);
+      var ext = (filename.split('.').pop() || '').toLowerCase();
+
+      // Render markdown with basic formatting
+      if (ext === 'md') {
+        container.innerHTML = '<div class="preview-markdown">' + this._renderMarkdown(text) + '</div>';
+        return;
+      }
+
+      var pre = document.createElement('pre');
+      pre.className = 'preview-text';
+      pre.textContent = text;
+      container.innerHTML = '';
+      container.appendChild(pre);
+    },
+
+    /** Very basic markdown → HTML renderer for previewing .md files */
+    _renderMarkdown(md) {
+      var html = md
+        // Code blocks (``` ... ```)
+        .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+        // Headings
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        // Bold and italic
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        // Inline code
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        // Horizontal rules
+        .replace(/^---$/gm, '<hr>')
+        // Unordered list items
+        .replace(/^- (.+)$/gm, '<li>$1</li>')
+        // Table rows (basic: | col | col |)
+        .replace(/^\|(.+)\|$/gm, function (match, inner) {
+          var cells = inner.split('|').map(function (c) { return c.trim(); });
+          return '<tr>' + cells.map(function (c) {
+            return '<td>' + c + '</td>';
+          }).join('') + '</tr>';
+        })
+        // Remove markdown table separator rows (|---|---|)
+        .replace(/<tr>(<td>-+<\/td>)+<\/tr>/g, '')
+        // Wrap consecutive <tr> in <table>
+        .replace(/((?:<tr>.*<\/tr>\n?)+)/g, '<table>$1</table>')
+        // Wrap consecutive <li> in <ul>
+        .replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>')
+        // Paragraphs: lines that aren't already HTML tags
+        .replace(/^(?!<[a-z/])(.+)$/gm, '<p>$1</p>');
+      return html;
+    },
+
+    renderUnsupported(file, container) {
+      var ft = getFileType(file.name);
+      container.innerHTML =
+        '<div class="preview-unsupported">' +
+        '  <i data-lucide="' + ft.icon + '" style="width:64px;height:64px;color:' + ft.color + '"></i>' +
+        '  <h3>' + UI._esc(file.name) + '</h3>' +
+        '  <p>Preview not available for this file type.</p>' +
+        '  <button class="btn btn-primary" id="viewer-unsupported-download" type="button">' +
+        '    <i data-lucide="download"></i> Download' +
+        '  </button>' +
+        '</div>';
+      lucide.createIcons({ nodes: [container] });
+      var btn = $('viewer-unsupported-download');
+      if (btn) btn.addEventListener('click', function () { FileOps.download(file.id); });
+    }
+  };
+
+  // ---------------------------------------------------------------------------
   // Context Menu
   // ---------------------------------------------------------------------------
 
@@ -1108,7 +1295,7 @@
         items.push({ label: 'Delete Permanently', icon: 'trash-2', action: function () { FileOps.permanentDelete(file.id); }, danger: true });
       } else {
         if (!isFolder) {
-          items.push({ label: 'Open / Preview', icon: 'eye', action: function () { Preview.show(file); } });
+          items.push({ label: 'Open / Preview', icon: 'eye', action: function () { Viewer.open(file); } });
           items.push({ label: 'Download', icon: 'download', action: function () { FileOps.download(file.id); } });
         } else {
           items.push({ label: 'Open Folder', icon: 'folder-open', action: function () {
@@ -1360,41 +1547,89 @@
       });
     });
 
-    // -- Preview panel actions --
-    var previewCloseBtn = $('preview-close-btn');
-    if (previewCloseBtn) {
-      previewCloseBtn.addEventListener('click', function () { UI.hidePreview(); });
+    // -- Viewer modal actions --
+    var viewerBackBtn = $('viewer-back-btn');
+    if (viewerBackBtn) {
+      viewerBackBtn.addEventListener('click', function () { Viewer.close(); });
     }
 
-    var previewDownloadBtn = $('preview-download-btn');
-    if (previewDownloadBtn) {
-      previewDownloadBtn.addEventListener('click', function () {
-        var fid = $('preview-panel').dataset.fileId;
-        if (fid) FileOps.download(fid);
+    var viewerDownloadBtn = $('viewer-download-btn');
+    if (viewerDownloadBtn) {
+      viewerDownloadBtn.addEventListener('click', function () {
+        if (Viewer.currentFile) FileOps.download(Viewer.currentFile.id);
       });
     }
 
-    var previewShareBtn = $('preview-share-btn');
-    if (previewShareBtn) {
-      previewShareBtn.addEventListener('click', function () {
-        var fid = $('preview-panel').dataset.fileId;
-        if (fid) FileOps.share(fid);
+    var viewerShareBtn = $('viewer-share-btn');
+    if (viewerShareBtn) {
+      viewerShareBtn.addEventListener('click', function () {
+        if (Viewer.currentFile) FileOps.share(Viewer.currentFile.id);
       });
     }
 
-    var previewEditBtn = $('preview-edit-btn');
-    if (previewEditBtn) {
-      previewEditBtn.addEventListener('click', function () {
-        var fid = $('preview-panel').dataset.fileId;
-        if (fid) Editor.open(fid);
+    var viewerEditBtn = $('viewer-edit-btn');
+    if (viewerEditBtn) {
+      viewerEditBtn.addEventListener('click', function () {
+        if (Viewer.currentFile) {
+          Viewer.close();
+          Editor.open(Viewer.currentFile.id);
+        }
       });
     }
 
-    var previewDeleteBtn = $('preview-delete-btn');
-    if (previewDeleteBtn) {
-      previewDeleteBtn.addEventListener('click', function () {
-        var fid = $('preview-panel').dataset.fileId;
-        if (fid) FileOps.delete(fid);
+    var viewerDeleteBtn = $('viewer-delete-btn');
+    if (viewerDeleteBtn) {
+      viewerDeleteBtn.addEventListener('click', function () {
+        if (Viewer.currentFile) {
+          FileOps.delete(Viewer.currentFile.id);
+          Viewer.close();
+        }
+      });
+    }
+
+    var viewerOpenWordBtn = $('viewer-open-word-btn');
+    if (viewerOpenWordBtn) {
+      viewerOpenWordBtn.addEventListener('click', function () {
+        if (Viewer.currentFile) {
+          // Try to open in Word using the ms-word protocol handler
+          // This works when the file is served from a URL (GitHub Pages)
+          var fileUrl = location.origin + location.pathname.replace(/\/[^/]*$/, '/') + 'demo-files/' + encodeURIComponent(Viewer.currentFile.name);
+          window.open('ms-word:ofe|u|' + fileUrl, '_blank');
+          UI.showToast('Opening in Microsoft Word...', 'info');
+        }
+      });
+    }
+
+    // -- Upload new version --
+    var viewerUploadVersionBtn = $('viewer-upload-version-btn');
+    var versionFileInput = $('version-file-input');
+    if (viewerUploadVersionBtn && versionFileInput) {
+      viewerUploadVersionBtn.addEventListener('click', function () {
+        versionFileInput.click();
+      });
+      versionFileInput.addEventListener('change', async function () {
+        if (versionFileInput.files.length > 0 && Viewer.currentFile) {
+          var newFile = versionFileInput.files[0];
+          try {
+            var buffer = await newFile.arrayBuffer();
+            await dataStore.setItem(Viewer.currentFile.id, buffer);
+            await Storage.updateFile(Viewer.currentFile.id, {
+              size: newFile.size,
+              mimeType: newFile.type || Viewer.currentFile.mimeType,
+              modifiedAt: Date.now()
+            });
+            UI.showToast('New version uploaded', 'success');
+            // Refresh the viewer with updated file
+            var updatedMeta = await Storage.getFile(Viewer.currentFile.id);
+            if (updatedMeta) Viewer.open(updatedMeta);
+            UI.renderFileList();
+            UI.updateStorageBar();
+          } catch (err) {
+            console.error('Version upload failed:', err);
+            UI.showToast('Upload failed', 'error');
+          }
+          versionFileInput.value = '';
+        }
       });
     }
 
@@ -1535,7 +1770,7 @@
       try {
         var meta = await Storage.getFile(fileId);
         if (meta) {
-          Preview.show(meta);
+          Viewer.open(meta);
         } else {
           UI.showToast('Shared file not found', 'error');
         }
@@ -1550,11 +1785,8 @@
   // ---------------------------------------------------------------------------
 
   async function seedDemoData() {
-    // Only seed once — set flag immediately to prevent duplicate runs on reload
     if (localStorage.getItem('opendocs-seeded')) return;
     localStorage.setItem('opendocs-seeded', '1');
-
-    var enc = new TextEncoder();
 
     // Helper: create a folder and return its ID
     async function folder(name, parentId) {
@@ -1566,43 +1798,43 @@
       return id;
     }
 
-    // Helper: create a file
-    async function file(name, mimeType, content, parentId, opts) {
+    // Helper: fetch a file from the repo and store it
+    async function fetchFile(urlPath, name, parentId, opts) {
       opts = opts || {};
-      var buf = (content instanceof ArrayBuffer) ? content : enc.encode(content).buffer;
-      await Storage.saveFile({
-        id: crypto.randomUUID(), name: name, type: 'file', mimeType: mimeType,
-        size: buf.byteLength, parentId: parentId || null,
-        shared: opts.shared || false,
-        sharedWith: opts.sharedWith || [],
-        starred: opts.starred || false,
-        deleted: false
-      }, buf);
-    }
-
-    // Create a minimal valid PNG (1x1 blue pixel)
-    function makeTinyPNG(r, g, b) {
-      var base64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8' +
-        (r === 0 ? 'H8BfwzAEA' : 'b5hfDwMDAQA') + 'I/AF8AAAAABJRU5ErkJggg==';
-      var binary = atob(base64);
-      var arr = new Uint8Array(binary.length);
-      for (var i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
-      return arr.buffer;
-    }
-
-    // Create a minimal SVG as an "image"
-    function makeSVG(label, color) {
-      return '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">' +
-        '<rect width="800" height="600" fill="' + color + '"/>' +
-        '<text x="400" y="300" font-family="Arial" font-size="32" fill="white" text-anchor="middle" dominant-baseline="middle">' + label + '</text>' +
-        '</svg>';
+      try {
+        var resp = await fetch(urlPath);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        var buffer = await resp.arrayBuffer();
+        var mimeTypes = {
+          docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          pdf: 'application/pdf',
+          svg: 'image/svg+xml',
+          md: 'text/markdown',
+          csv: 'text/csv',
+          txt: 'text/plain'
+        };
+        var ext = (name.split('.').pop() || '').toLowerCase();
+        await Storage.saveFile({
+          id: crypto.randomUUID(), name: name, type: 'file',
+          mimeType: mimeTypes[ext] || 'application/octet-stream',
+          size: buffer.byteLength, parentId: parentId || null,
+          shared: opts.shared || false,
+          sharedWith: opts.sharedWith || [],
+          starred: false, deleted: false
+        }, buffer);
+      } catch (err) {
+        console.warn('Failed to fetch demo file: ' + urlPath, err);
+      }
     }
 
     try {
-      // ── Root Project Folder ──
+      var base = 'demo-files/';
+
+      // Root project folder
       var projekt = await folder('Projekt Neubau Bürogebäude München');
 
-      // ── Subfolders ──
+      // Subfolders
       var planung       = await folder('01 Planung', projekt);
       var genehmigungen = await folder('02 Genehmigungen', projekt);
       var ausfuehrung   = await folder('03 Bauausführung', projekt);
@@ -1612,609 +1844,55 @@
       var vertraege     = await folder('07 Verträge', projekt);
       var sicherheit    = await folder('08 Arbeitssicherheit', projekt);
 
-      // ── 01 Planung ──
-      await file('Projektbeschreibung.txt', 'text/plain',
-        'PROJEKTBESCHREIBUNG\n' +
-        '====================\n\n' +
-        'Projekt:        Neubau Bürogebäude „TechPark München Ost"\n' +
-        'Bauherr:        Müller & Schmidt Immobilien GmbH\n' +
-        'Standort:       Messestraße 42, 81829 München\n' +
-        'Grundstück:     4.200 m²\n' +
-        'Bruttogeschossfläche: 12.500 m²\n' +
-        'Geschosse:      6 OG + 2 UG (Tiefgarage)\n' +
-        'Stellplätze:    180 (Tiefgarage) + 40 (oberirdisch)\n\n' +
-        'Geplante Nutzung:\n' +
-        '- EG: Empfang, Konferenzräume, Cafeteria\n' +
-        '- 1.-5. OG: Büroflächen (Open Space + Einzelbüros)\n' +
-        '- 6. OG: Geschäftsführung, Dachterrasse\n' +
-        '- UG1: Tiefgarage, Technikräume\n' +
-        '- UG2: Tiefgarage, Lagerräume\n\n' +
-        'Bauweise:       Stahlbetonkonstruktion mit vorgehängter Glasfassade\n' +
-        'Energiestandard: KfW-Effizienzgebäude 40\n' +
-        'Zertifizierung: DGNB Gold angestrebt\n\n' +
-        'Zeitraum:       03/2026 – 09/2028\n' +
-        'Gesamtbudget:   ca. 38,5 Mio. EUR (brutto)\n',
-        planung);
+      // Fetch all files from demo-files/
+      await fetchFile(base + '01 Planung/Projektbeschreibung.docx', 'Projektbeschreibung.docx', planung);
+      await fetchFile(base + '01 Planung/Raumprogramm.xlsx', 'Raumprogramm.xlsx', planung);
+      await fetchFile(base + '01 Planung/Terminplan_Uebersicht.pdf', 'Terminplan_Übersicht.pdf', planung);
+      await fetchFile(base + '01 Planung/Architekturbriefing.docx', 'Architekturbriefing.docx', planung);
 
-      await file('Raumprogramm.csv', 'text/csv',
-        'Geschoss;Bereich;Fläche (m²);Anzahl Arbeitsplätze;Bemerkung\n' +
-        'EG;Empfang / Lobby;280;;Repräsentativ gestaltet\n' +
-        'EG;Konferenzräume;420;60;6 Räume verschiedener Größe\n' +
-        'EG;Cafeteria / Küche;180;;Inkl. Außenbestuhlung\n' +
-        'EG;Technik / Sanitär;120;;\n' +
-        '1. OG;Open Space Büro;1.450;120;Flexible Arbeitsplätze\n' +
-        '1. OG;Besprechungszimmer;180;24;4 Räume\n' +
-        '1. OG;Teeküche / Sozialraum;80;;\n' +
-        '2. OG;Open Space Büro;1.450;120;\n' +
-        '2. OG;Besprechungszimmer;180;24;\n' +
-        '2. OG;Teeküche / Sozialraum;80;;\n' +
-        '3. OG;Einzelbüros;900;45;18 Büros\n' +
-        '3. OG;Open Space;550;48;\n' +
-        '3. OG;Besprechungszimmer;120;16;\n' +
-        '4. OG;Einzelbüros;900;45;\n' +
-        '4. OG;Open Space;550;48;\n' +
-        '4. OG;Serverraum;60;;Klimatisiert\n' +
-        '5. OG;Einzelbüros;680;34;\n' +
-        '5. OG;Großraumbüro;620;52;\n' +
-        '5. OG;Schulungsraum;200;30;\n' +
-        '6. OG;Geschäftsführung;450;8;Inkl. Sekretariat\n' +
-        '6. OG;Vorstandszimmer;120;12;\n' +
-        '6. OG;Dachterrasse;280;;Begrünt\n' +
-        'UG1;Tiefgarage;2.800;100;Stellplätze\n' +
-        'UG1;Technikräume;400;;HLKS\n' +
-        'UG2;Tiefgarage;2.400;80;Stellplätze\n' +
-        'UG2;Lagerräume;300;;\n',
-        planung);
+      await fetchFile(base + '02 Genehmigungen/Baugenehmigung_Bescheid.pdf', 'Baugenehmigung_Bescheid.pdf', genehmigungen);
+      await fetchFile(base + '02 Genehmigungen/Umweltvertraeglichkeitspruefung.docx', 'Umweltverträglichkeitsprüfung.docx', genehmigungen);
+      await fetchFile(base + '02 Genehmigungen/Brandschutzkonzept_Entwurf.docx', 'Brandschutzkonzept_Entwurf.docx', genehmigungen);
 
-      await file('Terminplan_Übersicht.md', 'text/markdown',
-        '# Terminplan — Neubau Bürogebäude München\n\n' +
-        '## Meilensteine\n\n' +
-        '| Nr. | Meilenstein | Termin | Status |\n' +
-        '|-----|-------------|--------|--------|\n' +
-        '| M1  | Baugenehmigung erteilt | 15.02.2026 | ✅ Erledigt |\n' +
-        '| M2  | Baustelleneinrichtung | 01.03.2026 | ✅ Erledigt |\n' +
-        '| M3  | Aushub & Verbau fertig | 30.04.2026 | 🔄 Laufend |\n' +
-        '| M4  | Rohbau UG fertig | 31.07.2026 | ⏳ Offen |\n' +
-        '| M5  | Rohbau gesamt fertig | 28.02.2027 | ⏳ Offen |\n' +
-        '| M6  | Fassade geschlossen | 30.06.2027 | ⏳ Offen |\n' +
-        '| M7  | Innenausbau fertig | 31.03.2028 | ⏳ Offen |\n' +
-        '| M8  | TGA Abnahme | 30.06.2028 | ⏳ Offen |\n' +
-        '| M9  | Gesamtabnahme | 31.08.2028 | ⏳ Offen |\n' +
-        '| M10 | Übergabe an Bauherr | 15.09.2028 | ⏳ Offen |\n\n' +
-        '## Kritischer Pfad\n\n' +
-        '- Gründungsarbeiten müssen vor Frostperiode abgeschlossen sein\n' +
-        '- Fassadenmontage wetterabhängig (April–Oktober empfohlen)\n' +
-        '- TGA-Installation parallel zum Innenausbau ab 3. OG\n\n' +
-        '## Hinweise\n\n' +
-        '- Pufferzeit: 4 Wochen vor jedem Meilenstein eingeplant\n' +
-        '- Wöchentliche Fortschrittsbesprechung: Dienstag 10:00 Uhr\n',
-        planung);
+      await fetchFile(base + '03 Bauausfuehrung/Baustellenordnung.pdf', 'Baustellenordnung.pdf', ausfuehrung);
+      await fetchFile(base + '03 Bauausfuehrung/Nachunternehmer_Uebersicht.xlsx', 'Nachunternehmer_Übersicht.xlsx', ausfuehrung);
+      await fetchFile(base + '03 Bauausfuehrung/Bautagesbericht_2026-03-15.docx', 'Bautagesbericht_2026-03-15.docx', ausfuehrung);
+      await fetchFile(base + '03 Bauausfuehrung/Maengelliste.xlsx', 'Mängelliste.xlsx', ausfuehrung);
 
-      await file('Architekturbriefing.txt', 'text/plain',
-        'ARCHITEKTURBRIEFING — TechPark München Ost\n' +
-        '============================================\n\n' +
-        'Gestaltungskonzept:\n' +
-        '- Moderne, offene Architektur mit maximaler Tageslichtnutzung\n' +
-        '- Glas-Aluminium-Fassade mit Sonnenschutzverglasung\n' +
-        '- Begrüntes Atrium im Erdgeschoss\n' +
-        '- Dachterrasse mit extensiver Begrünung\n\n' +
-        'Materialien:\n' +
-        '- Fassade: Structural-Glazing, Aluminium-Profile (eloxiert, anthrazit)\n' +
-        '- Innen: Eichenparkett, Sichtbeton-Akzente, Akustikdecken\n' +
-        '- Außenbereich: Naturstein (Granit), Cortenstahl-Elemente\n\n' +
-        'Nachhaltigkeitsanforderungen:\n' +
-        '- Photovoltaik-Anlage auf Dachfläche (min. 120 kWp)\n' +
-        '- Geothermie-Nutzung für Heizung und Kühlung\n' +
-        '- Regenwassernutzung für Bewässerung und WC-Spülung\n' +
-        '- Ladeinfrastruktur für E-Fahrzeuge (30% der Stellplätze)\n',
-        planung);
+      await fetchFile(base + '04 Kostenplanung/Kostenschaetzung_DIN276.xlsx', 'Kostenschätzung_DIN276.xlsx', kosten);
+      await fetchFile(base + '04 Kostenplanung/Zahlungsplan_2026.xlsx', 'Zahlungsplan_2026.xlsx', kosten);
+      await fetchFile(base + '04 Kostenplanung/Nachtragsforderungen.docx', 'Nachtragsforderungen.docx', kosten);
 
-      // ── 02 Genehmigungen ──
-      await file('Baugenehmigung_Bescheid.txt', 'text/plain',
-        'LANDESHAUPTSTADT MÜNCHEN\n' +
-        'Referat für Stadtplanung und Bauordnung\n' +
-        'Lokalbaukommission\n\n' +
-        '══════════════════════════════════════════\n' +
-        '           BAUGENEHMIGUNGSBESCHEID\n' +
-        '══════════════════════════════════════════\n\n' +
-        'Aktenzeichen:    LBK-2025-48291-BG\n' +
-        'Datum:           15.02.2026\n\n' +
-        'Bauherr:         Müller & Schmidt Immobilien GmbH\n' +
-        '                 Leopoldstraße 120, 80802 München\n\n' +
-        'Baugrundstück:   Messestraße 42, Fl.-Nr. 1847/3\n' +
-        '                 Gemarkung Berg am Laim\n\n' +
-        'Bauvorhaben:     Neubau eines sechsgeschossigen Bürogebäudes\n' +
-        '                 mit zweigeschossiger Tiefgarage\n\n' +
-        'Hiermit wird die Baugenehmigung gemäß Art. 68 BayBO erteilt.\n\n' +
-        'Auflagen:\n' +
-        '1. Die Bauarbeiten sind auf Mo–Fr 07:00–20:00 und Sa 08:00–14:00 zu beschränken.\n' +
-        '2. Ein Erschütterungsgutachten ist vor Beginn der Rammarbeiten vorzulegen.\n' +
-        '3. Der Baumbestand gemäß Baumschutzverordnung ist zu erhalten.\n' +
-        '4. Stellplatznachweis: 180 Stellplätze in der Tiefgarage nachgewiesen.\n' +
-        '5. Brandschutznachweis ist durch einen Prüfsachverständigen zu bestätigen.\n\n' +
-        'Diese Genehmigung erlischt, wenn nicht innerhalb von 3 Jahren mit dem\n' +
-        'Bau begonnen wird.\n\n' +
-        'Rechtsbehelfsbelehrung:\n' +
-        'Gegen diesen Bescheid kann innerhalb eines Monats Klage erhoben werden.\n',
-        genehmigungen);
-
-      await file('Umweltverträglichkeitsprüfung.txt', 'text/plain',
-        'UMWELTVERTRÄGLICHKEITSPRÜFUNG — Zusammenfassung\n' +
-        '=================================================\n\n' +
-        'Gutachter: Ing.-Büro Grüne Zukunft GmbH, München\n' +
-        'Datum: 08.11.2025\n\n' +
-        'Schutzgut Boden:\n' +
-        '- Versiegelungsgrad steigt von 45% auf 72%\n' +
-        '- Ausgleich durch Dachbegrünung und Entsiegelung angrenzender Flächen\n' +
-        '- Altlastenverdacht: keine Belastungen nachgewiesen\n\n' +
-        'Schutzgut Wasser:\n' +
-        '- Grundwasserstand: ca. 3,8 m unter GOK\n' +
-        '- Wasserhaltung während Bauphase erforderlich\n' +
-        '- Versickerung von Oberflächenwasser über Rigolen\n\n' +
-        'Schutzgut Luft / Klima:\n' +
-        '- Keine erheblichen Beeinträchtigungen zu erwarten\n' +
-        '- Kaltluftschneise bleibt durch Gebäudestellung erhalten\n\n' +
-        'Schutzgut Flora / Fauna:\n' +
-        '- 3 Laubbäume müssen gefällt werden (Ausgleichspflanzung: 6 Bäume)\n' +
-        '- Keine geschützten Arten auf dem Grundstück nachgewiesen\n\n' +
-        'Ergebnis: Das Vorhaben ist umweltverträglich.\n',
-        genehmigungen);
-
-      await file('Brandschutzkonzept_Entwurf.txt', 'text/plain',
-        'BRANDSCHUTZKONZEPT (Entwurf)\n' +
-        '============================\n\n' +
-        'Erstellt: Brandschutz Ingenieure Weber & Partner\n' +
-        'Stand: 20.01.2026\n\n' +
-        'Gebäudeklasse: 5 (Hochhausgrenze nicht überschritten)\n' +
-        'Nutzung: Büro (Sonderbau gemäß Art. 2 Abs. 4 BayBO)\n\n' +
-        'Rettungswege:\n' +
-        '- 2 bauliche Rettungswege je Geschoss (notwendige Treppenhäuser)\n' +
-        '- Treppenhaus Nord: 1,50 m Laufbreite\n' +
-        '- Treppenhaus Süd: 1,50 m Laufbreite\n' +
-        '- Rettungsweglänge max. 35 m (nachgewiesen)\n\n' +
-        'Brandabschnitte:\n' +
-        '- Jedes Geschoss bildet einen Brandabschnitt\n' +
-        '- Tiefgarage: eigener Brandabschnitt mit F90-Abtrennung\n' +
-        '- Technikräume: F90-Abtrennung\n\n' +
-        'Löschanlagen:\n' +
-        '- Sprinkleranlage gemäß VdS CEA 4001 (Vollschutz)\n' +
-        '- Wandhydranten in allen Geschossen\n' +
-        '- Tiefgarage: Sprinkler + CO2-Löschanlage (E-Fahrzeuge)\n\n' +
-        'Rauchableitung:\n' +
-        '- Natürliche Entrauchung über Fassadenöffnungen\n' +
-        '- Maschinelle Entrauchung in Tiefgarage und Atrium\n' +
-        '- Rauch- und Wärmeabzugsanlage (RWA) im Treppenhaus\n\n' +
-        'Brandmeldeanlage: Kategorie 1 (Vollschutz), BMA mit Aufschaltung zur Feuerwehr\n',
-        genehmigungen);
-
-      // ── 03 Bauausführung ──
-      await file('Baustellenordnung.txt', 'text/plain',
-        'BAUSTELLENORDNUNG\n' +
-        'Projekt: Neubau Bürogebäude TechPark München Ost\n' +
-        '================================================\n\n' +
-        'Gültig ab: 01.03.2026\n' +
-        'Bauleitung: Dipl.-Ing. Thomas Berger, Berger Baumanagement GmbH\n\n' +
-        '1. ARBEITSZEITEN\n' +
-        '   Mo–Fr: 07:00–18:00 Uhr\n' +
-        '   Sa:    08:00–14:00 Uhr (nach Voranmeldung)\n' +
-        '   Sonn- und Feiertage: Arbeitsverbot\n\n' +
-        '2. ZUGANG\n' +
-        '   - Zufahrt ausschließlich über Messestraße (Tor 1)\n' +
-        '   - Alle Personen müssen sich am Baucontainer anmelden\n' +
-        '   - Persönliche Schutzausrüstung ist Pflicht: Helm, Sicherheitsschuhe, Warnweste\n' +
-        '   - Unbefugten ist der Zutritt verboten\n\n' +
-        '3. ORDNUNG UND SAUBERKEIT\n' +
-        '   - Jedes Gewerk räumt seinen Arbeitsbereich täglich auf\n' +
-        '   - Mülltrennung ist vorgeschrieben (Container: Bauschutt, Holz, Metall, Restmüll)\n' +
-        '   - Gefahrstoffe sind im Gefahrstofflager zu lagern\n\n' +
-        '4. SICHERHEIT\n' +
-        '   - Sicherheitsunterweisung vor Arbeitsbeginn verpflichtend\n' +
-        '   - Absturzsicherung ab 2 m Höhe\n' +
-        '   - Feuerlöscher an jedem Geschoss vorhalten\n' +
-        '   - Sammelplatz bei Evakuierung: Parkplatz Messestraße 38\n\n' +
-        '5. ANSPRECHPARTNER\n' +
-        '   Bauleiter:         Dipl.-Ing. Thomas Berger     | 0171 555 2341\n' +
-        '   SiGeKo:            Ing. Andrea Hofmann           | 0172 888 4567\n' +
-        '   Polier:            Michael Gruber                | 0170 333 9876\n',
-        ausfuehrung);
-
-      await file('Nachunternehmer_Übersicht.csv', 'text/csv',
-        'Gewerk;Firma;Ansprechpartner;Vertragssumme (EUR);Status;Beginn;Ende\n' +
-        'Erdarbeiten / Verbau;Bauer Tiefbau GmbH;Hr. Bauer;1.850.000;Beauftragt;01.03.2026;30.04.2026\n' +
-        'Rohbau;Züblin AG, NL München;Fr. Kellner;8.200.000;Beauftragt;01.05.2026;28.02.2027\n' +
-        'Fassade;Metallbau Schüco Partner;Hr. Weiss;4.100.000;Vergabe läuft;01.03.2027;30.06.2027\n' +
-        'Elektro;Elektro Müller GmbH;Hr. Müller;2.300.000;Beauftragt;01.06.2027;31.01.2028\n' +
-        'Heizung / Lüftung / Sanitär;Haustechnik Süd GmbH;Fr. Wagner;3.500.000;Beauftragt;01.06.2027;28.02.2028\n' +
-        'Aufzüge;Schindler Deutschland;Hr. Fischer;680.000;Angebot liegt vor;01.09.2027;31.01.2028\n' +
-        'Trockenbau;Knauf Systeme Partner;Hr. Braun;1.200.000;Vergabe läuft;01.09.2027;31.03.2028\n' +
-        'Bodenbeläge;Parkett & Design GmbH;Fr. Schwarz;890.000;Noch nicht vergeben;01.01.2028;30.04.2028\n' +
-        'Malerarbeiten;Malerbetrieb König;Hr. König;520.000;Noch nicht vergeben;01.02.2028;30.04.2028\n' +
-        'Außenanlagen;Garten- und Landschaftsbau Grün;Hr. Stein;740.000;Noch nicht vergeben;01.05.2028;31.07.2028\n' +
-        'Sprinkler / BMA;Minimax GmbH;Fr. Richter;960.000;Angebot liegt vor;01.07.2027;31.12.2027\n',
-        ausfuehrung);
-
-      await file('Bautagesbericht_2026-03-15.txt', 'text/plain',
-        'BAUTAGESBERICHT\n' +
-        '===============\n\n' +
-        'Projekt:  Neubau Bürogebäude TechPark München Ost\n' +
-        'Datum:    15.03.2026 (Dienstag)\n' +
-        'Wetter:   Bewölkt, 8°C, kein Niederschlag\n' +
-        'Bericht:  Dipl.-Ing. Thomas Berger\n\n' +
-        'PERSONAL AUF DER BAUSTELLE:\n' +
-        '- Bauer Tiefbau:    12 Arbeiter, 1 Polier\n' +
-        '- Vermessung:       2 Vermessungsingenieure\n' +
-        '- Bauleitung:       1 Bauleiter, 1 Bauüberwacher\n\n' +
-        'GERÄTE:\n' +
-        '- 1x Raupenbagger CAT 330 (Aushub)\n' +
-        '- 2x LKW Kipper (Erdtransport)\n' +
-        '- 1x Radlader Liebherr L 550\n' +
-        '- 1x Rüttelplatte (Verdichtung)\n\n' +
-        'DURCHGEFÜHRTE ARBEITEN:\n' +
-        '- Aushub Baugrube Abschnitt B2, Tiefe -3,20 m erreicht\n' +
-        '- Verbauarbeiten (Spundwand) Achse 3–5 fortgesetzt\n' +
-        '- Grundwassermessung: Pegel bei -3,65 m (unverändert)\n' +
-        '- Erdtransport: ca. 280 m³ abgefahren (Deponie Feldmoching)\n\n' +
-        'BESONDERE VORKOMMNISSE:\n' +
-        '- Keine\n\n' +
-        'NÄCHSTE SCHRITTE:\n' +
-        '- Aushub Abschnitt B3 beginnen\n' +
-        '- Spundwandarbeiten Achse 5–7\n' +
-        '- Baugrubensohle Abschnitt B1 verdichten\n',
-        ausfuehrung);
-
-      await file('Mängelliste.csv', 'text/csv',
-        'Nr.;Gewerk;Beschreibung;Ort;Festgestellt am;Frist;Status;Verantwortlich\n' +
-        'M-001;Erdarbeiten;Verdichtungsgrad in Achse 2 nicht erreicht (95% statt 97%);UG2, Abschnitt A1;12.04.2026;19.04.2026;Offen;Bauer Tiefbau\n' +
-        'M-002;Verbau;Spundwand Achse 4 weist Versatz von 3 cm auf;Nordseite;08.04.2026;15.04.2026;In Bearbeitung;Bauer Tiefbau\n' +
-        'M-003;Rohbau;Betondeckung an Stütze C3 unterschritten;1. OG;15.06.2026;22.06.2026;Behoben;Züblin AG\n',
-        ausfuehrung);
-
-      // ── 04 Kostenplanung ──
-      await file('Kostenschätzung_DIN276.csv', 'text/csv',
-        'KG;Kostengruppe;Bezeichnung;Kosten (EUR netto);Kosten (EUR brutto);Anteil (%)\n' +
-        '100;Grundstück;Grundstückskosten;5.200.000;6.188.000;16,1\n' +
-        '200;Vorbereitende Maßnahmen;Herrichten, Erschließen;380.000;452.200;1,2\n' +
-        '300;Bauwerk – Baukonstruktionen;Rohbau, Fassade, Ausbau;16.800.000;19.992.000;51,9\n' +
-        '310;;Baugrube;1.850.000;2.201.500;\n' +
-        '320;;Gründung;1.200.000;1.428.000;\n' +
-        '330;;Außenwände / Fassade;4.100.000;4.879.000;\n' +
-        '340;;Innenwände;1.200.000;1.428.000;\n' +
-        '350;;Decken;3.800.000;4.522.000;\n' +
-        '360;;Dächer;950.000;1.130.500;\n' +
-        '370;;Baukonstruktive Einbauten;680.000;809.200;\n' +
-        '390;;Sonstige;3.020.000;3.593.800;\n' +
-        '400;Bauwerk – Technische Anlagen;HLKS, Elektro, Aufzüge;7.440.000;8.853.600;23,0\n' +
-        '410;;Abwasser, Wasser, Gas;620.000;737.800;\n' +
-        '420;;Wärmeversorgung;1.100.000;1.309.000;\n' +
-        '430;;Lüftung / Klima;1.450.000;1.725.500;\n' +
-        '440;;Starkstromanlagen;1.500.000;1.785.000;\n' +
-        '450;;Fernmelde / IT;800.000;952.000;\n' +
-        '460;;Aufzüge;680.000;809.200;\n' +
-        '470;;Sprinkler / BMA;960.000;1.142.400;\n' +
-        '490;;Sonstige TGA;330.000;392.700;\n' +
-        '500;Außenanlagen;Außenanlagen, Stellplätze;740.000;880.600;2,3\n' +
-        '600;Ausstattung / Kunstwerke;;120.000;142.800;0,4\n' +
-        '700;Baunebenkosten;Planung, Gutachten, Gebühren;1.650.000;1.963.500;5,1\n' +
-        ';;;GESAMT;32.330.000;38.472.700;100,0\n',
-        kosten);
-
-      await file('Zahlungsplan_2026.csv', 'text/csv',
-        'Monat;Geplant (EUR);Kumuliert (EUR);Ist (EUR);Abweichung (EUR);Bemerkung\n' +
-        'März 2026;680.000;680.000;695.200;+15.200;Baustelleneinrichtung teurer\n' +
-        'April 2026;920.000;1.600.000;880.000;-40.000;\n' +
-        'Mai 2026;1.100.000;2.700.000;;;Prognose\n' +
-        'Juni 2026;1.350.000;4.050.000;;;Prognose\n' +
-        'Juli 2026;1.350.000;5.400.000;;;Prognose\n' +
-        'August 2026;1.200.000;6.600.000;;;Prognose\n' +
-        'September 2026;1.400.000;8.000.000;;;Prognose\n' +
-        'Oktober 2026;1.500.000;9.500.000;;;Prognose\n' +
-        'November 2026;1.300.000;10.800.000;;;Prognose\n' +
-        'Dezember 2026;800.000;11.600.000;;;Winterpause, reduziert\n',
-        kosten);
-
-      await file('Nachtragsforderungen.md', 'text/markdown',
-        '# Nachtragsforderungen — Stand April 2026\n\n' +
-        '## NT-001: Mehrkosten Verbauarbeiten\n\n' +
-        '- **Auftragnehmer:** Bauer Tiefbau GmbH\n' +
-        '- **Forderung:** 85.000 EUR netto\n' +
-        '- **Begründung:** Unerwartete Findlinge im Baugrund, zusätzlicher Aushub und\n' +
-        '  Felsfräsarbeiten erforderlich. Bodengutachten hatte sandigen Kies prognostiziert.\n' +
-        '- **Bewertung Bauleitung:** Teilweise berechtigt. Empfehlung: 62.000 EUR anerkennen.\n' +
-        '- **Status:** In Prüfung\n\n' +
-        '## NT-002: Mehrkosten Wasserhaltung\n\n' +
-        '- **Auftragnehmer:** Bauer Tiefbau GmbH\n' +
-        '- **Forderung:** 38.000 EUR netto\n' +
-        '- **Begründung:** Grundwasserzustrom höher als im Gutachten angenommen.\n' +
-        '  Zusätzliche Pumpen und längere Laufzeit erforderlich.\n' +
-        '- **Bewertung Bauleitung:** Berechtigt, Mengenmehrung nachvollziehbar.\n' +
-        '- **Status:** Genehmigt durch Bauherrn (18.04.2026)\n\n' +
-        '---\n\n' +
-        '**Summe Nachtragsforderungen:** 123.000 EUR netto\n' +
-        '**Davon anerkannt:** 38.000 EUR netto\n' +
-        '**Davon in Prüfung:** 85.000 EUR netto\n',
-        kosten);
-
-      // ── 05 Protokolle ──
-      await file('Baubesprechung_Nr12_2026-04-02.md', 'text/markdown',
-        '# Baubesprechung Nr. 12\n\n' +
-        '**Datum:** 02.04.2026, 10:00–11:30 Uhr\n' +
-        '**Ort:** Baubüro Container, Messestraße 42\n\n' +
-        '**Teilnehmer:**\n' +
-        '- Dipl.-Ing. Thomas Berger (Bauleitung)\n' +
-        '- Dr. Martin Müller (Bauherr)\n' +
-        '- Arch. Sabine Lechner (Entwurf)\n' +
-        '- Ing. Andrea Hofmann (SiGeKo)\n' +
-        '- Hr. Josef Bauer (Bauer Tiefbau)\n' +
-        '- Fr. Claudia Kellner (Züblin AG)\n\n' +
-        '---\n\n' +
-        '## TOP 1: Terminübersicht\n\n' +
-        'Der Aushub liegt ca. 5 Arbeitstage hinter dem Plan. Ursache:\n' +
-        'Findlinge im Bereich Achse 2-4 (siehe Nachtrag NT-001).\n' +
-        'Maßnahme: Zusätzlicher Bagger ab KW 15 auf der Baustelle.\n\n' +
-        '**Verantwortlich:** Hr. Bauer | **Termin:** 07.04.2026\n\n' +
-        '## TOP 2: Rohbauplanung\n\n' +
-        'Züblin bestätigt die Bereitschaft zur Mobilisierung ab 01.05.2026.\n' +
-        'Schalungspläne für UG2 werden bis 15.04.2026 eingereicht.\n' +
-        'Bewehrungspläne vom Tragwerksplaner stehen noch aus.\n\n' +
-        '**Verantwortlich:** Fr. Kellner / Tragwerksplaner | **Termin:** 15.04.2026\n\n' +
-        '## TOP 3: Kosten\n\n' +
-        'Nachtrag NT-001 wird geprüft. Nachtrag NT-002 (Wasserhaltung)\n' +
-        'wurde vom Bauherrn in der Besprechung genehmigt.\n\n' +
-        'Aktueller Budgetstatus: im Plan (Abweichung < 1%)\n\n' +
-        '## TOP 4: Arbeitssicherheit\n\n' +
-        'Fr. Hofmann meldet: Baustellenbegehung am 28.03. ohne Beanstandungen.\n' +
-        'PSA-Kontrolle ab nächster Woche verschärft (Helmtragepflicht in allen Bereichen).\n\n' +
-        '## TOP 5: Verschiedenes\n\n' +
-        '- Bauherr wünscht Foto-Dokumentation alle 2 Wochen\n' +
-        '- Nächste Baubesprechung: 09.04.2026, 10:00 Uhr\n\n' +
-        '---\n\n' +
-        '*Protokoll erstellt: Th. Berger, 02.04.2026*\n',
-        protokolle, { shared: true, sharedWith: [
+      await fetchFile(base + '05 Protokolle/Baubesprechung_Nr12_2026-04-02.docx', 'Baubesprechung_Nr12_2026-04-02.docx', protokolle,
+        { shared: true, sharedWith: [
           { name: 'Thomas Berger', email: 'berger@bau-mg.de', permission: 'edit' },
           { name: 'Martin Müller', email: 'mueller@ms-immo.de', permission: 'view' }
         ]});
+      await fetchFile(base + '05 Protokolle/Baubesprechung_Nr11_2026-03-26.docx', 'Baubesprechung_Nr11_2026-03-26.docx', protokolle);
+      await fetchFile(base + '05 Protokolle/Abnahmeprotokoll_Vorlage.docx', 'Abnahmeprotokoll_Vorlage.docx', protokolle);
 
-      await file('Baubesprechung_Nr11_2026-03-26.md', 'text/markdown',
-        '# Baubesprechung Nr. 11\n\n' +
-        '**Datum:** 26.03.2026, 10:00–11:15 Uhr\n' +
-        '**Ort:** Baubüro Container, Messestraße 42\n\n' +
-        '**Teilnehmer:**\n' +
-        '- Dipl.-Ing. Thomas Berger (Bauleitung)\n' +
-        '- Arch. Sabine Lechner (Entwurf)\n' +
-        '- Hr. Josef Bauer (Bauer Tiefbau)\n\n' +
-        '---\n\n' +
-        '## TOP 1: Fortschritt Aushub\n\n' +
-        'Aushub Abschnitt B1 abgeschlossen. Verdichtungsprobe bestanden.\n' +
-        'Abschnitt B2 begonnen, planmäßiger Fortschritt.\n\n' +
-        '## TOP 2: Spundwandarbeiten\n\n' +
-        'Spundwand Achse 1–3 fertiggestellt. Dichtigkeitsprüfung o.B.\n' +
-        'Weiter mit Achse 3–5 ab KW 14.\n\n' +
-        '## TOP 3: Nächste Schritte\n\n' +
-        '- Aushub B2 fertigstellen (Ziel: 05.04.2026)\n' +
-        '- Spundwand Achse 3–5\n' +
-        '- Grundwassermessungen 2x wöchentlich\n\n' +
-        '---\n\n' +
-        '*Protokoll erstellt: Th. Berger, 26.03.2026*\n',
-        protokolle);
+      await fetchFile(base + '06 Fotos/Baustellenuebersicht_2026-03-10.svg', 'Baustellenübersicht_2026-03-10.svg', fotos);
+      await fetchFile(base + '06 Fotos/Spundwand_Achse1-3_2026-03-25.svg', 'Spundwand_Achse1-3_2026-03-25.svg', fotos);
+      await fetchFile(base + '06 Fotos/Baugrube_von_oben_2026-04-01.svg', 'Baugrube_von_oben_2026-04-01.svg', fotos);
+      await fetchFile(base + '06 Fotos/Baustellenzufahrt_2026-03-05.svg', 'Baustellenzufahrt_2026-03-05.svg', fotos);
 
-      await file('Abnahmeprotokoll_Vorlage.txt', 'text/plain',
-        'ABNAHMEPROTOKOLL\n' +
-        '=================\n\n' +
-        'Projekt:     Neubau Bürogebäude TechPark München Ost\n' +
-        'Gewerk:      ____________________________\n' +
-        'Firma:       ____________________________\n' +
-        'Datum:       ____________________________\n\n' +
-        'Teilnehmer:\n' +
-        '- Bauherr:       ____________________________\n' +
-        '- Bauleitung:    ____________________________\n' +
-        '- Auftragnehmer: ____________________________\n\n' +
-        'Abnahmeart:  [ ] Förmliche Abnahme  [ ] Teilabnahme  [ ] Schlussabnahme\n\n' +
-        'Festgestellte Mängel:\n' +
-        'Nr. | Beschreibung | Frist | Nachbesserung erfolgt\n' +
-        '----|-------------|-------|---------------------\n' +
-        '    |             |       |\n' +
-        '    |             |       |\n' +
-        '    |             |       |\n\n' +
-        'Ergebnis:\n' +
-        '[ ] Abnahme erklärt (ohne Mängel)\n' +
-        '[ ] Abnahme erklärt (mit Mängelvorbehalt)\n' +
-        '[ ] Abnahme verweigert (wesentliche Mängel)\n\n' +
-        'Gewährleistungsbeginn: ____________________________\n' +
-        'Gewährleistungsende:   ____________________________\n\n' +
-        'Unterschriften:\n\n' +
-        '____________________________    ____________________________\n' +
-        'Bauherr / Bauleitung            Auftragnehmer\n',
-        protokolle);
+      await fetchFile(base + '07 Vertraege/Generalplanervertrag_Entwurf.docx', 'Generalplanervertrag_Entwurf.docx', vertraege);
+      await fetchFile(base + '07 Vertraege/Buergschaftsuebersicht.xlsx', 'Bürgschaftsübersicht.xlsx', vertraege);
 
-      // ── 06 Fotos ──
-      await file('Baustellenübersicht_2026-03-10.svg', 'image/svg+xml',
-        makeSVG('Baustellenübersicht — 10.03.2026\nAushubarbeiten Abschnitt B1', '#4a6fa5'),
-        fotos);
+      await fetchFile(base + '08 Arbeitssicherheit/SiGePlan_Uebersicht.docx', 'SiGePlan_Übersicht.docx', sicherheit);
+      await fetchFile(base + '08 Arbeitssicherheit/Unterweisungsnachweis_2026-03.xlsx', 'Unterweisungsnachweis_2026-03.xlsx', sicherheit);
+      await fetchFile(base + '08 Arbeitssicherheit/Unfallbericht_Vorlage.docx', 'Unfallbericht_Vorlage.docx', sicherheit);
 
-      await file('Spundwand_Achse1-3_2026-03-25.svg', 'image/svg+xml',
-        makeSVG('Spundwandarbeiten Achse 1–3\n25.03.2026', '#5a8f5a'),
-        fotos);
-
-      await file('Baugrube_von_oben_2026-04-01.svg', 'image/svg+xml',
-        makeSVG('Baugrube — Drohnenaufnahme\n01.04.2026', '#7a6a8a'),
-        fotos);
-
-      await file('Baustellenzufahrt_2026-03-05.svg', 'image/svg+xml',
-        makeSVG('Baustelleneinrichtung / Zufahrt Tor 1\n05.03.2026', '#8a7a5a'),
-        fotos);
-
-      // ── 07 Verträge ──
-      await file('Generalplanervertrag_Entwurf.txt', 'text/plain',
-        'GENERALPLANERVERTRAG (Entwurf)\n' +
-        '===============================\n\n' +
-        'zwischen\n\n' +
-        'Müller & Schmidt Immobilien GmbH\n' +
-        'Leopoldstraße 120, 80802 München\n' +
-        '(nachfolgend „Auftraggeber")\n\n' +
-        'und\n\n' +
-        'Architekten Lechner & Kollegen PartGmbB\n' +
-        'Maximilianstraße 35, 80539 München\n' +
-        '(nachfolgend „Auftragnehmer")\n\n' +
-        'über die Generalplanung für den Neubau eines Bürogebäudes\n' +
-        'auf dem Grundstück Messestraße 42, 81829 München.\n\n' +
-        '§ 1 Leistungsumfang\n' +
-        'Der Auftragnehmer erbringt Planungsleistungen der Leistungsphasen\n' +
-        '1–9 gemäß HOAI 2021, § 34 für folgende Fachbereiche:\n' +
-        '- Objektplanung Gebäude\n' +
-        '- Tragwerksplanung (Unterauftrag)\n' +
-        '- TGA-Planung (Unterauftrag)\n' +
-        '- Freianlagenplanung\n\n' +
-        '§ 2 Honorar\n' +
-        'Das Honorar wird auf Basis der HOAI 2021 berechnet:\n' +
-        '- Anrechenbare Kosten: 24.240.000 EUR (KG 300 + 400)\n' +
-        '- Honorarzone: IV\n' +
-        '- Honorarsatz: Mitte\n' +
-        '- Geschätztes Gesamthonorar: ca. 1.650.000 EUR netto\n\n' +
-        '§ 3 Termine\n' +
-        '- LP 1-2: abgeschlossen\n' +
-        '- LP 3-4: bis 30.11.2025\n' +
-        '- LP 5: bis 28.02.2026\n' +
-        '- LP 6-7: bis 30.06.2026\n' +
-        '- LP 8: baubegleitend\n' +
-        '- LP 9: nach Abnahme\n\n' +
-        '[Weitere Paragraphen: Haftung, Versicherung, Kündigung, etc.]\n',
-        vertraege);
-
-      await file('Bürgschaftsübersicht.csv', 'text/csv',
-        'Firma;Art der Bürgschaft;Betrag (EUR);Bank;Gültig bis;Status\n' +
-        'Bauer Tiefbau GmbH;Vertragserfüllungsbürgschaft;185.000;Sparkasse München;31.12.2026;Vorliegend\n' +
-        'Bauer Tiefbau GmbH;Gewährleistungsbürgschaft;92.500;Sparkasse München;31.12.2031;Noch nicht fällig\n' +
-        'Züblin AG;Vertragserfüllungsbürgschaft;820.000;Deutsche Bank;28.02.2028;Vorliegend\n' +
-        'Elektro Müller GmbH;Vertragserfüllungsbürgschaft;230.000;Volksbank München;31.03.2028;Vorliegend\n' +
-        'Haustechnik Süd GmbH;Vertragserfüllungsbürgschaft;350.000;Commerzbank;28.02.2029;Vorliegend\n',
-        vertraege);
-
-      // ── 08 Arbeitssicherheit ──
-      await file('SiGePlan_Übersicht.md', 'text/markdown',
-        '# Sicherheits- und Gesundheitsschutzplan (SiGePlan)\n\n' +
-        '**Projekt:** Neubau Bürogebäude TechPark München Ost\n' +
-        '**SiGeKo:** Ing. Andrea Hofmann\n' +
-        '**Stand:** März 2026\n\n' +
-        '## Gefährdungsbeurteilung — Aktuelle Bauphase (Erdarbeiten)\n\n' +
-        '| Gefährdung | Maßnahme | Verantwortlich |\n' +
-        '|------------|----------|----------------|\n' +
-        '| Absturz in Baugrube | Absturzsicherung (Geländer), Zugangsleiter | Polier |\n' +
-        '| Baugrubeneinbruch | Verbau gemäß statischer Berechnung, tägliche Sichtprüfung | Fachbauleiter |\n' +
-        '| Überfahren/Anfahren | Einweiser bei Rückwärtsfahrt, getrennte Verkehrswege | Polier |\n' +
-        '| Lärm | Gehörschutz ab 85 dB(A), Lärmminderung an Quelle | Alle Gewerke |\n' +
-        '| Staub | Befeuchtung der Fahrbahnen, Staubschutzmasken | Bauer Tiefbau |\n' +
-        '| Grundwasserkontakt | Wasserdichte Kleidung, Hautschutzplan | Bauer Tiefbau |\n\n' +
-        '## Persönliche Schutzausrüstung (PSA)\n\n' +
-        'Auf der gesamten Baustelle gilt:\n' +
-        '- Schutzhelm (EN 397)\n' +
-        '- Sicherheitsschuhe S3 (EN ISO 20345)\n' +
-        '- Warnweste (EN ISO 20471, Klasse 2)\n' +
-        '- Schutzbrille bei Schleif- und Bohrarbeiten\n' +
-        '- Gehörschutz bei Arbeiten > 85 dB(A)\n\n' +
-        '## Notfallplan\n\n' +
-        '- **Notruf:** 112\n' +
-        '- **Ersthelfer:** Michael Gruber (Polier), Hr. Bauer\n' +
-        '- **Erste-Hilfe-Kasten:** Baubüro + jede Bauebene\n' +
-        '- **Sammelplatz:** Parkplatz Messestraße 38\n' +
-        '- **Nächstes Krankenhaus:** Klinikum Bogenhausen (4,2 km)\n',
-        sicherheit);
-
-      await file('Unterweisungsnachweis_2026-03.csv', 'text/csv',
-        'Datum;Name;Firma;Gewerk;Thema;Unterweisung durch;Unterschrift\n' +
-        '01.03.2026;Gruber, Michael;Bauer Tiefbau;Erdarbeiten;Erstunterweisung Baustellenordnung;Hofmann, Andrea;Ja\n' +
-        '01.03.2026;Schmidt, Peter;Bauer Tiefbau;Erdarbeiten;Erstunterweisung Baustellenordnung;Hofmann, Andrea;Ja\n' +
-        '01.03.2026;Kovac, Ivan;Bauer Tiefbau;Erdarbeiten;Erstunterweisung Baustellenordnung;Hofmann, Andrea;Ja\n' +
-        '01.03.2026;Nowak, Piotr;Bauer Tiefbau;Erdarbeiten;Erstunterweisung Baustellenordnung;Hofmann, Andrea;Ja\n' +
-        '01.03.2026;Yilmaz, Mehmet;Bauer Tiefbau;Erdarbeiten;Erstunterweisung Baustellenordnung;Hofmann, Andrea;Ja\n' +
-        '05.03.2026;Huber, Franz;Bauer Tiefbau;Baggerführer;Unterweisung Erdbaumaschinen;Gruber, Michael;Ja\n' +
-        '05.03.2026;Keller, Hans;Bauer Tiefbau;Baggerführer;Unterweisung Erdbaumaschinen;Gruber, Michael;Ja\n' +
-        '10.03.2026;Alle AN;Bauer Tiefbau;Erdarbeiten;Sicherheitsbegehung Baugrube;Hofmann, Andrea;Ja\n' +
-        '15.03.2026;Alle AN;Bauer Tiefbau;Erdarbeiten;Arbeiten in kontaminierten Bereichen;Hofmann, Andrea;Ja\n' +
-        '22.03.2026;Alle AN;Bauer Tiefbau;Erdarbeiten;Verhalten bei Grundwassereintritt;Hofmann, Andrea;Ja\n',
-        sicherheit);
-
-      await file('Unfallbericht_Vorlage.txt', 'text/plain',
-        'UNFALLBERICHT / VERBANDBUCHEINTRAG\n' +
-        '====================================\n\n' +
-        'Baustelle:    Neubau Bürogebäude TechPark München Ost\n' +
-        'Datum/Uhrzeit: _______________ / _______\n\n' +
-        'Verletzte Person:\n' +
-        'Name:          ____________________________\n' +
-        'Firma:         ____________________________\n' +
-        'Gewerk:        ____________________________\n\n' +
-        'Unfallhergang:\n' +
-        '_______________________________________________\n' +
-        '_______________________________________________\n' +
-        '_______________________________________________\n\n' +
-        'Art der Verletzung:\n' +
-        '_______________________________________________\n\n' +
-        'Erste Hilfe geleistet durch:\n' +
-        '_______________________________________________\n\n' +
-        'Maßnahmen:\n' +
-        '[ ] Erste Hilfe vor Ort\n' +
-        '[ ] Arztbesuch / Durchgangsarzt\n' +
-        '[ ] Krankenhauseinweisung\n' +
-        '[ ] Rettungsdienst gerufen\n\n' +
-        'Unfallursache / Empfehlung:\n' +
-        '_______________________________________________\n' +
-        '_______________________________________________\n\n' +
-        'Erstellt von: ______________ Datum: __________\n',
-        sicherheit);
-
-      // ── Files at project root level ──
-      await file('Projektübersicht.md', 'text/markdown',
-        '# Neubau Bürogebäude — TechPark München Ost\n\n' +
-        '## Projektdaten\n\n' +
-        '| Eigenschaft | Wert |\n' +
-        '|-------------|------|\n' +
-        '| Bauherr | Müller & Schmidt Immobilien GmbH |\n' +
-        '| Standort | Messestraße 42, 81829 München |\n' +
-        '| Generalplaner | Architekten Lechner & Kollegen PartGmbB |\n' +
-        '| Bauleitung | Berger Baumanagement GmbH |\n' +
-        '| Baubeginn | 01.03.2026 |\n' +
-        '| Fertigstellung | 15.09.2028 (geplant) |\n' +
-        '| Gesamtbudget | 38,5 Mio. EUR (brutto) |\n\n' +
-        '## Ordnerstruktur\n\n' +
-        '```\n' +
-        '01 Planung/          — Projektbeschreibung, Raumprogramm, Terminplan\n' +
-        '02 Genehmigungen/    — Baugenehmigung, Gutachten, Brandschutz\n' +
-        '03 Bauausführung/    — Baustellenordnung, Nachunternehmer, Tagesberichte\n' +
-        '04 Kostenplanung/    — DIN 276, Zahlungspläne, Nachträge\n' +
-        '05 Protokolle/       — Baubesprechungen, Abnahmen\n' +
-        '06 Fotos/            — Baudokumentation\n' +
-        '07 Verträge/         — Planervertrag, Bürgschaften\n' +
-        '08 Arbeitssicherheit/ — SiGePlan, Unterweisungen\n' +
-        '```\n\n' +
-        '## Ansprechpartner\n\n' +
-        '| Name | Rolle | Telefon |\n' +
-        '|------|-------|---------|\n' +
-        '| Dr. Martin Müller | Bauherr | 089 / 12345-100 |\n' +
-        '| Arch. Sabine Lechner | Generalplanerin | 089 / 98765-200 |\n' +
-        '| Dipl.-Ing. Thomas Berger | Bauleiter | 0171 555 2341 |\n' +
-        '| Ing. Andrea Hofmann | SiGeKo | 0172 888 4567 |\n' +
-        '| Michael Gruber | Polier | 0170 333 9876 |\n',
-        projekt, { shared: true, sharedWith: [
+      // Root-level files
+      await fetchFile(base + 'Projektuebersicht.md', 'Projektübersicht.md', projekt,
+        { shared: true, sharedWith: [
           { name: 'Sabine Lechner', email: 'lechner@arch-lk.de', permission: 'edit' },
           { name: 'Thomas Berger', email: 'berger@bau-mg.de', permission: 'edit' },
           { name: 'Andrea Hofmann', email: 'hofmann@sigeko.de', permission: 'view' }
         ]});
-
-      await file('Kontaktliste.csv', 'text/csv',
-        'Name;Firma;Rolle;E-Mail;Telefon;Mobiltelefon\n' +
-        'Dr. Martin Müller;Müller & Schmidt Immobilien GmbH;Bauherr;mueller@ms-immo.de;089 12345-100;0171 111 2233\n' +
-        'Arch. Sabine Lechner;Architekten Lechner & Kollegen;Generalplanerin;lechner@arch-lk.de;089 98765-200;0172 222 3344\n' +
-        'Dipl.-Ing. Thomas Berger;Berger Baumanagement GmbH;Bauleiter;berger@bau-mg.de;089 54321-50;0171 555 2341\n' +
-        'Ing. Andrea Hofmann;Hofmann Sicherheitstechnik;SiGeKo;hofmann@sigeko.de;089 77777-10;0172 888 4567\n' +
-        'Hr. Josef Bauer;Bauer Tiefbau GmbH;Erdarbeiten;bauer@bauer-tiefbau.de;089 66666-30;0170 444 5566\n' +
-        'Fr. Claudia Kellner;Züblin AG, NL München;Rohbau;kellner@zueblin.de;089 55555-20;0171 666 7788\n' +
-        'Michael Gruber;Bauer Tiefbau GmbH;Polier;gruber@bauer-tiefbau.de;;0170 333 9876\n' +
-        'Hr. Werner Weiss;Metallbau Schüco Partner;Fassade;weiss@schueco-partner.de;089 44444-15;0172 999 0011\n' +
-        'Hr. Karl Müller;Elektro Müller GmbH;Elektro;k.mueller@elektro-mueller.de;089 33333-25;0173 111 2244\n' +
-        'Fr. Petra Wagner;Haustechnik Süd GmbH;HLKS;wagner@ht-sued.de;089 22222-35;0174 222 3355\n',
-        projekt);
+      await fetchFile(base + 'Kontaktliste.xlsx', 'Kontaktliste.xlsx', projekt);
 
       UI.showToast('Demo-Projekt geladen: Neubau Bürogebäude München', 'success');
-
     } catch (err) {
       console.error('Seed failed:', err);
       UI.showToast('Demo-Daten konnten nicht geladen werden', 'error');
