@@ -419,13 +419,8 @@
     /** Attach click / dblclick / contextmenu to a file element. */
     _bindFileEvents(el, file) {
       var self = this;
-      // Single click — select
+      // Single click — folders navigate in, files select
       el.addEventListener('click', function (e) {
-        e.stopPropagation();
-        self.selectFile(file.id);
-      });
-      // Double click — open folder or preview
-      el.addEventListener('dblclick', function (e) {
         e.stopPropagation();
         if (file.type === 'folder') {
           self.currentFolder = file.id;
@@ -433,6 +428,13 @@
           self.renderBreadcrumb();
           self.renderFileList();
         } else {
+          self.selectFile(file.id);
+        }
+      });
+      // Double click — open preview for files
+      el.addEventListener('dblclick', function (e) {
+        e.stopPropagation();
+        if (file.type !== 'folder') {
           Preview.show(file);
         }
       });
