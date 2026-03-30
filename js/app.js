@@ -265,7 +265,7 @@
 
   var UI = {
     currentFolder: null,
-    currentView: localStorage.getItem('opendocs-view') || 'grid',
+    currentView: localStorage.getItem('opendocs-view') || 'list',
     currentSection: 'my-files',
     selectedFile: null,
     sortBy: 'name',
