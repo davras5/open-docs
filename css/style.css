@@ -2235,6 +2235,28 @@ img {
   font-size: 12px;
 }
 
+/* Media mode — no white paper, content floats on dark bg */
+.viewer-content.viewer-content-media {
+  background: transparent;
+  box-shadow: none;
+  max-width: none;
+  min-height: auto;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewer-content.viewer-content-media .preview-image {
+  min-height: auto;
+}
+
+.viewer-content.viewer-content-media .preview-image img {
+  max-height: calc(100vh - 120px);
+  border-radius: 6px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+}
+
 /* Docx preview */
 .viewer-content .preview-docx { font-size: 15px; line-height: 1.8; }
 .viewer-content .preview-docx h1 { font-size: 24px; font-weight: 700; margin: 24px 0 12px; color: #1e293b; }

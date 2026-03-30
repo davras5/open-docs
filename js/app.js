@@ -1117,6 +1117,7 @@
 
       // Show loading state
       content.innerHTML = '<div class="preview-loading"><i data-lucide="loader-2" class="spin"></i><span>Loading preview...</span></div>';
+      content.classList.remove('viewer-content-media');
       modal.hidden = false;
       lucide.createIcons({ nodes: [content] });
 
@@ -1130,6 +1131,11 @@
       try {
         var data = await Storage.getData(file.id);
         var ft = getFileType(file.name);
+
+        // Images render directly on dark bg, no white paper
+        if (ft.category === 'image') {
+          content.classList.add('viewer-content-media');
+        }
 
         if (ft.category === 'document') {
           await this.renderDocx(data, content);
