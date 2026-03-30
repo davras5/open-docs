@@ -94,6 +94,28 @@
   /** Safely get a DOM element by ID. */
   function $(id) { return document.getElementById(id); }
 
+  /** Sanitize HTML — strip dangerous tags/attributes to prevent XSS.
+   *  Allows safe formatting tags from Mammoth/SheetJS output. */
+  function sanitizeHTML(html) {
+    var temp = document.createElement('div');
+    temp.innerHTML = html;
+    // Remove script, style, iframe, object, embed, form, and event handlers
+    var dangerous = temp.querySelectorAll('script, style, iframe, object, embed, form, link, meta, base');
+    for (var i = 0; i < dangerous.length; i++) dangerous[i].remove();
+    // Remove event handler attributes from all elements
+    var all = temp.querySelectorAll('*');
+    for (var i = 0; i < all.length; i++) {
+      var attrs = all[i].attributes;
+      for (var j = attrs.length - 1; j >= 0; j--) {
+        var name = attrs[j].name.toLowerCase();
+        if (name.indexOf('on') === 0 || name === 'href' && attrs[j].value.trim().toLowerCase().indexOf('javascript:') === 0) {
+          all[i].removeAttribute(attrs[j].name);
+        }
+      }
+    }
+    return temp.innerHTML;
+  }
+
   // ---------------------------------------------------------------------------
   // Storage Engine
   // ---------------------------------------------------------------------------
@@ -439,6 +461,10 @@
           iconDiv.innerHTML = '';
           iconDiv.classList.add('file-card-thumb');
           iconDiv.style.backgroundImage = 'url(' + url + ')';
+          // Revoke after image loads to free memory
+          var img = new Image();
+          img.onload = function () { URL.revokeObjectURL(url); };
+          img.src = url;
         } else if (ft.category === 'pdf' && typeof pdfjsLib !== 'undefined') {
           pdfjsLib.getDocument({ data: data }).promise.then(function (pdf) {
             return pdf.getPage(1);
@@ -951,7 +977,7 @@
         var editorContent = $('editor-content');
         if (typeof mammoth !== 'undefined') {
           var result = await mammoth.convertToHtml({ arrayBuffer: data });
-          editorContent.innerHTML = result.value;
+          editorContent.innerHTML = sanitizeHTML(result.value);
         } else {
           // Fallback: try to render as text
           editorContent.innerHTML = '<p>' + new TextDecoder().decode(data) + '</p>';
@@ -964,18 +990,28 @@
       }
     },
 
-    /** Save the current editor HTML content back to storage. */
+    /** Save the current editor HTML content back to storage.
+     *  WARNING: This replaces the original .docx binary with HTML.
+     *  A backup of the original is stored under key 'backup-{id}'. */
     async save() {
       if (!this.currentFileId) return;
+      if (!confirm('Saving will convert this document to HTML format. The original .docx formatting may be lost. Continue?')) return;
       try {
+        // Backup original binary before overwriting (one-time)
+        var backupKey = 'backup-' + this.currentFileId;
+        var existingBackup = await dataStore.getItem(backupKey);
+        if (!existingBackup) {
+          var original = await dataStore.getItem(this.currentFileId);
+          if (original) await dataStore.setItem(backupKey, original);
+        }
+
         var editorContent = $('editor-content');
         var html = editorContent.innerHTML;
-        // For the prototype, store the HTML directly as file content
         var encoder = new TextEncoder();
         var buffer = encoder.encode(html).buffer;
         await dataStore.setItem(this.currentFileId, buffer);
         await Storage.updateFile(this.currentFileId, { modifiedAt: Date.now() });
-        UI.showToast('Document saved', 'success');
+        UI.showToast('Document saved (original backed up)', 'success');
         UI.renderFileList();
       } catch (err) {
         console.error('Save failed:', err);
@@ -1161,7 +1197,7 @@
         return;
       }
       var result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
-      container.innerHTML = '<div class="preview-docx">' + result.value + '</div>';
+      container.innerHTML = '<div class="preview-docx">' + sanitizeHTML(result.value) + '</div>';
     },
 
     async renderXlsx(arrayBuffer, container) {
@@ -1176,7 +1212,7 @@
         return;
       }
       var html = XLSX.utils.sheet_to_html(workbook.Sheets[firstSheet]);
-      container.innerHTML = '<div class="preview-xlsx">' + html + '</div>';
+      container.innerHTML = '<div class="preview-xlsx">' + sanitizeHTML(html) + '</div>';
     },
 
     async renderPdf(arrayBuffer, container) {
@@ -1202,7 +1238,9 @@
           canvasContext: canvas.getContext('2d'),
           viewport: viewport
         }).promise;
+        page.cleanup();
       }
+      pdf.destroy(); // Free PDF.js memory
     },
 
     // -- Zoom state --
@@ -1336,7 +1374,7 @@
 
       // Render markdown with basic formatting
       if (ext === 'md') {
-        container.innerHTML = '<div class="preview-markdown">' + this._renderMarkdown(text) + '</div>';
+        container.innerHTML = '<div class="preview-markdown">' + sanitizeHTML(this._renderMarkdown(text)) + '</div>';
         return;
       }
 
@@ -2225,12 +2263,13 @@
         }
 
         case 'folder': {
-          await Metadata.load();
+          var meta = await Metadata.load();
+          if (!meta) { UI.showToast('Metadata not available', 'error'); return; }
           // Parse the path segments and navigate into the deepest folder
           var segments = route.path.split('/').filter(Boolean);
           var folderId = null;
           for (var i = 0; i < segments.length; i++) {
-            var folder = Metadata.data.folders.find(function(f) {
+            var folder = meta.folders.find(function(f) {
               return f.slug === segments[i] && f.parentId === folderId;
             });
             if (!folder) {

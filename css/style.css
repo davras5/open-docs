@@ -103,23 +103,6 @@ textarea:focus-visible {
   top: 0;
   left: 0;
   right: 0;
-  height: var(--size-navbar);
-  z-index: var(--z-navbar);
-}
-
-.app-layout {
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  grid-template-areas: "sidebar main";
-  height: calc(100vh - 56px);
-  margin-top: 56px;
-  overflow: hidden;
-}
-
-/* Navbar
-   ======================================================================== */
-
-.navbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -128,6 +111,15 @@ textarea:focus-visible {
   background: var(--color-bg-surface);
   border-bottom: 1px solid var(--color-border);
   z-index: var(--z-navbar);
+}
+
+.app-layout {
+  display: grid;
+  grid-template-columns: var(--size-sidebar) 1fr;
+  grid-template-areas: "sidebar main";
+  height: calc(100vh - var(--size-navbar));
+  margin-top: var(--size-navbar);
+  overflow: hidden;
 }
 
 .navbar-left {
