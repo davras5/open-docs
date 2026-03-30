@@ -366,69 +366,79 @@ print("  ✓ 01 Planung/Gestaltungskonzept.docx")
 # 02 BEWILLIGUNGEN
 # ══════════════════════════════════════════════════════════════════════════════
 
-# Baubewilligung.pdf (multi-page official doc)
-pdf = FPDF()
-pdf.set_auto_page_break(auto=True, margin=25)
+# ── PDF helper: Unicode-capable FPDF with Arial TTF ──
+FONT_DIR = "C:/Windows/Fonts"
 
-def h1(t): pdf.set_font('Helvetica','B',16); pdf.cell(0,10,t,new_x='LMARGIN',new_y='NEXT'); pdf.ln(2)
-def h2(t): pdf.set_font('Helvetica','B',12); pdf.cell(0,8,t,new_x='LMARGIN',new_y='NEXT'); pdf.ln(1)
-def p(t): pdf.set_font('Helvetica','',10); pdf.multi_cell(0,5.5,t); pdf.ln(2)
-def bullet(t):
-    pdf.set_font('Helvetica','',10)
-    x = pdf.get_x()
-    pdf.cell(10, 5.5, '  - ', new_x='END')
+def make_pdf():
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=25)
+    pdf.add_font("Arial", "", os.path.join(FONT_DIR, "arial.ttf"))
+    pdf.add_font("Arial", "B", os.path.join(FONT_DIR, "arialbd.ttf"))
+    pdf.add_font("Arial", "I", os.path.join(FONT_DIR, "ariali.ttf"))
+    return pdf
+
+def h1(pdf, t): pdf.set_font('Arial','B',16); pdf.cell(0,10,t,new_x='LMARGIN',new_y='NEXT'); pdf.ln(2)
+def h2(pdf, t): pdf.set_font('Arial','B',12); pdf.cell(0,8,t,new_x='LMARGIN',new_y='NEXT'); pdf.ln(1)
+def p(pdf, t): pdf.set_font('Arial','',10); pdf.multi_cell(0,5.5,t); pdf.ln(2)
+def bullet(pdf, t):
+    pdf.set_font('Arial','',10)
+    pdf.cell(10, 5.5, '  – ', new_x='END')
     pdf.multi_cell(pdf.w - pdf.r_margin - pdf.get_x(), 5.5, t)
     pdf.ln(1)
 
+# Baubewilligung.pdf (multi-page official doc)
+pdf = make_pdf()
+
 pdf.add_page()
-pdf.set_font('Helvetica','B',11)
-pdf.cell(0,6,'KANTON ZUERICH',new_x='LMARGIN',new_y='NEXT')
-pdf.set_font('Helvetica','',10)
+pdf.set_font('Arial','B',11)
+pdf.cell(0,6,'KANTON ZÜRICH',new_x='LMARGIN',new_y='NEXT')
+pdf.set_font('Arial','',10)
 pdf.cell(0,5,'Baudirektion',new_x='LMARGIN',new_y='NEXT')
-pdf.cell(0,5,'Amt fuer Raumentwicklung',new_x='LMARGIN',new_y='NEXT')
+pdf.cell(0,5,'Amt für Raumentwicklung',new_x='LMARGIN',new_y='NEXT')
 pdf.ln(15)
-pdf.set_font('Helvetica','B',20)
+pdf.set_font('Arial','B',20)
 pdf.cell(0,12,'Baubewilligungsbescheid',align='C',new_x='LMARGIN',new_y='NEXT')
 pdf.ln(10)
 
-p('Aktenzeichen: ARE-2025-14892-BB')
-p('Datum: 20. Januar 2026')
-p('Bauherrschaft: Seefeld Immobilien AG, Seefeldstrasse 42, 8008 Zuerich')
-p('Grundstueck: Kat.-Nr. 8008-1247, Seefeldstrasse 128, 8008 Zuerich')
-p('Bauvorhaben: Abbruch Bestandsgebaeude und Neubau eines siebengeschossigen Wohn- und Geschaeftshauses mit Tiefgarage')
-p('Wohnzone: W5 gemaess BZO Stadt Zuerich')
+p(pdf, 'Aktenzeichen: ARE-2025-14892-BB')
+p(pdf, 'Datum: 20. Januar 2026')
+p(pdf, 'Bauherrschaft: Seefeld Immobilien AG, Seefeldstrasse 42, 8008 Zürich')
+p(pdf, 'Grundstück: Kat.-Nr. 8008-1247, Seefeldstrasse 128, 8008 Zürich')
+p(pdf, 'Bauvorhaben: Abbruch Bestandsgebäude und Neubau eines siebengeschossigen Wohn- und Geschäftshauses mit Tiefgarage')
+p(pdf, 'Wohnzone: W5 gemäss BZO Stadt Zürich')
 
 pdf.ln(3)
-h2('Beschluss')
-p('Gestuezt auf Art. 22 RPG, $$ 218 ff. PBG und die kantonale Bauverordnung wird die Baubewilligung fuer das oben bezeichnete Vorhaben erteilt.')
+h2(pdf, 'Beschluss')
+p(pdf, 'Gestützt auf Art. 22 RPG, §§ 218 ff. PBG und die kantonale Bauverordnung wird die Baubewilligung für das oben bezeichnete Vorhaben erteilt.')
 
 pdf.add_page()
-h2('Auflagen')
+h2(pdf, 'Auflagen')
 auflagen = [
-    '1. Die Bauarbeiten sind auf Montag bis Freitag 07:00-19:00 Uhr und Samstag 08:00-17:00 Uhr zu beschraenken. Sonn- und Feiertagsarbeit ist untersagt.',
-    '2. Vor Beginn der Abbruch- und Aushubarbeiten ist eine Beweissicherung der angrenzenden Liegenschaften durchzufuehren.',
-    '3. Der Baumbestand gemaess Baumschutzverordnung der Stadt Zuerich ist zu erhalten. Die drei Platanen entlang der Bellerivestrasse sind waehrend der Bauzeit zu schuetzen.',
-    '4. Die Anforderungen der Laermschutzverordnung (LSV) sind einzuhalten. Waehrend der Bauphase sind laermintensive Arbeiten auf ein Minimum zu beschraenken.',
+    '1. Die Bauarbeiten sind auf Montag bis Freitag 07:00–19:00 Uhr und Samstag 08:00–17:00 Uhr zu beschränken. Sonn- und Feiertagsarbeit ist untersagt.',
+    '2. Vor Beginn der Abbruch- und Aushubarbeiten ist eine Beweissicherung der angrenzenden Liegenschaften durchzuführen.',
+    '3. Der Baumbestand gemäss Baumschutzverordnung der Stadt Zürich ist zu erhalten. Die drei Platanen entlang der Bellerivestrasse sind während der Bauzeit zu schützen.',
+    '4. Die Anforderungen der Lärmschutzverordnung (LSV) sind einzuhalten. Während der Bauphase sind lärmintensive Arbeiten auf ein Minimum zu beschränken.',
     '5. Das Brandschutzkonzept ist vor Baubeginn durch die Kantonale Feuerpolizei zu genehmigen.',
-    '6. Der Nachweis der Erdbebensicherheit gemaess SIA 261 ist vor Beginn der Rohbauarbeiten einzureichen.',
-    '7. Die Zufahrt zur Tiefgarage ueber die Bellerivestrasse ist gemaess den Vorgaben des Tiefbauamts auszufuehren.',
-    '8. Fuer die Grundwasserabsenkung waehrend der Bauphase ist eine separate Bewilligung beim AWEL einzuholen.',
-    '9. Der Minergie-P-ECO-Nachweis ist spaetestens bei der Schlussabnahme vorzulegen.',
-    '10. Die Photovoltaik-Anlage ist gemaess den Bestimmungen der MuKEn 2014 auszufuehren und vor Inbetriebnahme beim Elektrizitaetswerk anzumelden.',
+    '6. Der Nachweis der Erdbebensicherheit gemäss SIA 261 ist vor Beginn der Rohbauarbeiten einzureichen.',
+    '7. Die Zufahrt zur Tiefgarage über die Bellerivestrasse ist gemäss den Vorgaben des Tiefbauamts auszuführen.',
+    '8. Für die Grundwasserabsenkung während der Bauphase ist eine separate Bewilligung beim AWEL einzuholen.',
+    '9. Der Minergie-P-ECO-Nachweis ist spätestens bei der Schlussabnahme vorzulegen.',
+    '10. Die Photovoltaik-Anlage ist gemäss den Bestimmungen der MuKEn 2014 auszuführen und vor Inbetriebnahme beim Elektrizitätswerk anzumelden.',
 ]
 for a in auflagen:
-    p(a)
+    p(pdf, a)
 
 pdf.add_page()
-h2('Rechtsmittelbelehrung')
-p('Gegen diesen Bescheid kann innert 30 Tagen seit Zustellung beim Baurekursgericht des Kantons Zuerich schriftlich Rekurs erhoben werden. Die Rekursschrift muss einen Antrag und dessen Begruendung enthalten.')
+h2(pdf, 'Rechtsmittelbelehrung')
+p(pdf, 'Gegen diesen Bescheid kann innert 30 Tagen seit Zustellung beim Baurekursgericht des Kantons Zürich schriftlich Rekurs erhoben werden. Die Rekursschrift muss einen Antrag und dessen Begründung enthalten.')
 
 pdf.ln(10)
-p('Zuerich, 20. Januar 2026')
+p(pdf, 'Zürich, 20. Januar 2026')
 pdf.ln(8)
-p('Amt fuer Raumentwicklung')
-p('Abteilung Baubewilligungen')
+p(pdf, 'Amt für Raumentwicklung')
+p(pdf, 'Abteilung Baubewilligungen')
 pdf.ln(10)
+pdf.set_font('Arial','',10)
 pdf.cell(0,6,'_________________________',new_x='LMARGIN',new_y='NEXT')
 pdf.cell(0,6,'lic. iur. Christine Lang',new_x='LMARGIN',new_y='NEXT')
 pdf.cell(0,6,'Leiterin Baubewilligungen',new_x='LMARGIN',new_y='NEXT')
@@ -507,25 +517,24 @@ styled_xlsx("03 Bauausführung/Unternehmerverzeichnis.xlsx",
 )
 
 # Baustellenordnung.pdf
-pdf = FPDF()
-pdf.set_auto_page_break(auto=True, margin=25)
+pdf = make_pdf()
 pdf.add_page()
-h1('Baustellenordnung')
-pdf.set_font('Helvetica','',10)
-pdf.cell(0,6,'Ueberbauung Seefeld, Seefeldstrasse 128, 8008 Zuerich',new_x='LMARGIN',new_y='NEXT')
-pdf.cell(0,6,'Gueltig ab: 01.02.2026 | Bauleitung: Implenia Schweiz AG',new_x='LMARGIN',new_y='NEXT')
+h1(pdf, 'Baustellenordnung')
+pdf.set_font('Arial','',10)
+pdf.cell(0,6,'Überbauung Seefeld, Seefeldstrasse 128, 8008 Zürich',new_x='LMARGIN',new_y='NEXT')
+pdf.cell(0,6,'Gültig ab: 01.02.2026 | Bauleitung: Implenia Schweiz AG',new_x='LMARGIN',new_y='NEXT')
 pdf.ln(5)
 
 sections = [
-    ('1. Arbeitszeiten', 'Montag bis Freitag: 07:00 - 19:00 Uhr\nSamstag: 08:00 - 17:00 Uhr\nSonn- und Feiertage: Arbeitsverbot\n\nLaermintensive Arbeiten (Abbruch, Rammen, Saegen): Mo-Fr 08:00-12:00 und 13:30-17:00'),
-    ('2. Zugang und Sicherheit', 'Zufahrt ausschliesslich ueber Bellerivestrasse (Tor 1).\nAlle Personen melden sich am Baubuero an.\nPersoenliche Schutzausruestung ist Pflicht: Helm, Sicherheitsschuhe S3, Warnweste.\nBesucher nur in Begleitung einer autorisierten Person.\nFotografieren nur mit Genehmigung der Bauleitung.'),
-    ('3. Ordnung und Entsorgung', 'Jedes Gewerk raeumt seinen Arbeitsbereich taeglich auf.\nMuelltrennung gemaess VVEA: Bauschutt, Holz, Metall, Kunststoff, Sonderabfall.\nGefahrstoffe sind im verschlossenen Gefahrstofflager aufzubewahren.\nKeine Materialablagerung ausserhalb der markierten Lagerflaechen.'),
-    ('4. Umweltschutz', 'Fahrwege sind bei Trockenheit zu befeuchten.\nBaumaschinen mit Partikelfilter (Stufe IIIB) verwenden.\nOel- und Betriebsstofflagerung nur auf versiegelten Flaechen mit Auffangwanne.\nBaumschutz gemaess SN 640 561 fuer die drei Platanen.'),
-    ('5. Notfall / Ansprechpartner', 'Sammelplatz: Parkplatz Bellerivestrasse 45\nErsthelfer: Roman Steiner (Polier), Tel. +41 79 445 12 88\nNaechstes Spital: Universitaetsspital Zuerich (2.8 km)\nBauleiter: Marco Keller, Tel. +41 58 474 00 00\nSicherheitsbeauftragte: Nina Frei, Tel. +41 44 720 15 30'),
+    ('1. Arbeitszeiten', 'Montag bis Freitag: 07:00–19:00 Uhr\nSamstag: 08:00–17:00 Uhr\nSonn- und Feiertage: Arbeitsverbot\n\nLärmintensive Arbeiten (Abbruch, Rammen, Sägen): Mo–Fr 08:00–12:00 und 13:30–17:00'),
+    ('2. Zugang und Sicherheit', 'Zufahrt ausschliesslich über Bellerivestrasse (Tor 1).\nAlle Personen melden sich am Baubüro an.\nPersönliche Schutzausrüstung ist Pflicht: Helm, Sicherheitsschuhe S3, Warnweste.\nBesucher nur in Begleitung einer autorisierten Person.\nFotografieren nur mit Genehmigung der Bauleitung.'),
+    ('3. Ordnung und Entsorgung', 'Jedes Gewerk räumt seinen Arbeitsbereich täglich auf.\nMülltrennung gemäss VVEA: Bauschutt, Holz, Metall, Kunststoff, Sonderabfall.\nGefahrstoffe sind im verschlossenen Gefahrstofflager aufzubewahren.\nKeine Materialablagerung ausserhalb der markierten Lagerflächen.'),
+    ('4. Umweltschutz', 'Fahrwege sind bei Trockenheit zu befeuchten.\nBaumaschinen mit Partikelfilter (Stufe IIIB) verwenden.\nÖl- und Betriebsstofflagerung nur auf versiegelten Flächen mit Auffangwanne.\nBaumschutz gemäss SN 640 561 für die drei Platanen.'),
+    ('5. Notfall / Ansprechpartner', 'Sammelplatz: Parkplatz Bellerivestrasse 45\nErsthelfer: Roman Steiner (Polier), Tel. +41 79 445 12 88\nNächstes Spital: Universitätsspital Zürich (2.8 km)\nBauleiter: Marco Keller, Tel. +41 58 474 00 00\nSicherheitsbeauftragte: Nina Frei, Tel. +41 44 720 15 30'),
 ]
 for title, body_text in sections:
-    h2(title)
-    p(body_text)
+    h2(pdf, title)
+    p(pdf, body_text)
 
 pdf.output(os.path.join(DEMO, "03 Bauausführung", "Baustellenordnung.pdf"))
 print(f"  ✓ 03 Bauausführung/Baustellenordnung.pdf ({pdf.pages_count} pages)")
@@ -735,113 +744,107 @@ doc.save(os.path.join(DEMO, "05 Protokolle", "Bausitzung_Nr14_2026-04-16.docx"))
 print("  ✓ 05 Protokolle/Bausitzung_Nr14_2026-04-16.docx")
 
 # Baufortschrittsbericht (long PDF)
-pdf = FPDF()
-pdf.set_auto_page_break(auto=True, margin=25)
+pdf = make_pdf()
+
+def add_table(pdf, headers, rows):
+    cw = (pdf.w - 40) / len(headers)
+    pdf.set_font('Arial','B',9)
+    for hdr in headers: pdf.cell(cw, 7, hdr, border=1, align='C')
+    pdf.ln()
+    pdf.set_font('Arial','',9)
+    for row in rows:
+        for c in row: pdf.cell(cw, 6, str(c), border=1)
+        pdf.ln()
+    pdf.ln(5)
 
 # Cover
 pdf.add_page()
-pdf.set_font('Helvetica','B',28)
+pdf.set_font('Arial','B',28)
 pdf.ln(35)
 pdf.cell(0,15,'Baufortschrittsbericht',align='C',new_x='LMARGIN',new_y='NEXT')
-pdf.set_font('Helvetica','',16)
-pdf.cell(0,10,'Ueberbauung Seefeld, Zuerich',align='C',new_x='LMARGIN',new_y='NEXT')
+pdf.set_font('Arial','',16)
+pdf.cell(0,10,'Überbauung Seefeld, Zürich',align='C',new_x='LMARGIN',new_y='NEXT')
 pdf.ln(8)
-pdf.set_font('Helvetica','',12)
-pdf.cell(0,8,'Berichtszeitraum: Maerz / April 2026',align='C',new_x='LMARGIN',new_y='NEXT')
+pdf.set_font('Arial','',12)
+pdf.cell(0,8,'Berichtszeitraum: März / April 2026',align='C',new_x='LMARGIN',new_y='NEXT')
 pdf.cell(0,8,'Implenia Schweiz AG | Dipl. Bauing. ETH Marco Keller',align='C',new_x='LMARGIN',new_y='NEXT')
 pdf.ln(40)
-pdf.set_font('Helvetica','',9)
-pdf.cell(0,5,'Vertraulich - Nur fuer Projektbeteiligte',align='C',new_x='LMARGIN',new_y='NEXT')
+pdf.set_font('Arial','I',9)
+pdf.cell(0,5,'Vertraulich – Nur für Projektbeteiligte',align='C',new_x='LMARGIN',new_y='NEXT')
 
 # TOC
 pdf.add_page()
-h1('Inhaltsverzeichnis')
-for item in ['1. Zusammenfassung','2. Terminuebersicht','3. Baufortschritt im Detail','4. Kostenuebersicht','5. Qualitaet und Maengel','6. Arbeitssicherheit','7. Nachtraege','8. Risiken und Massnahmen','9. Ausblick Mai 2026','10. Fotodokumentation (Verweis)']:
-    pdf.set_font('Helvetica','',11)
+h1(pdf, 'Inhaltsverzeichnis')
+for item in ['1. Zusammenfassung','2. Terminübersicht','3. Baufortschritt im Detail','4. Kostenübersicht','5. Qualität und Mängel','6. Arbeitssicherheit','7. Nachträge','8. Risiken und Massnahmen','9. Ausblick Mai 2026','10. Fotodokumentation (Verweis)']:
+    pdf.set_font('Arial','',11)
     pdf.cell(0,7,item,new_x='LMARGIN',new_y='NEXT')
 
 # Content pages
 pdf.add_page()
-h1('1. Zusammenfassung')
-p('Der Baufortschritt in den Monaten Maerz und April 2026 verlief weitgehend planmaessig. Der Abbruch des Bestandsgebaeudes wurde termingerecht abgeschlossen. Die Baugrube ist zu ca. 65% ausgehoben. Die Bohrpfahlarbeiten sind zu ca. 60% abgeschlossen (26 von 42 Pfaehlen).')
-p('Wesentliche Ereignisse:')
-for e in ['Abbruch Bestandsgebaeude abgeschlossen (15.03.2026)','Spezialtiefbau (Bohrpfaehle) begonnen am 20.03.2026','Felslinsen in Abschnitten B/C entdeckt - Nachtrag NT-001','Grundwasserzufluss hoeher als erwartet - Nachtrag NT-002 genehmigt','Keine Arbeitsunfaelle im Berichtszeitraum']:
-    bullet(e)
+h1(pdf, '1. Zusammenfassung')
+p(pdf, 'Der Baufortschritt in den Monaten März und April 2026 verlief weitgehend planmässig. Der Abbruch des Bestandsgebäudes wurde termingerecht abgeschlossen. Die Baugrube ist zu ca. 65% ausgehoben. Die Bohrpfahlarbeiten sind zu ca. 60% abgeschlossen (26 von 42 Pfählen).')
+p(pdf, 'Wesentliche Ereignisse:')
+for e in ['Abbruch Bestandsgebäude abgeschlossen (15.03.2026)','Spezialtiefbau (Bohrpfähle) begonnen am 20.03.2026','Felslinsen in Abschnitten B/C entdeckt – Nachtrag NT-001','Grundwasserzufluss höher als erwartet – Nachtrag NT-002 genehmigt','Keine Arbeitsunfälle im Berichtszeitraum']:
+    bullet(pdf, e)
 pdf.ln(3)
-p('Gesamtbewertung: GELB (bedingt planmaessig). Ursache ist eine Verzoegerung von ca. 4 Arbeitstagen durch die Felslinsen. Gegenmassnahmen sind eingeleitet.')
+p(pdf, 'Gesamtbewertung: GELB (bedingt planmässig). Ursache ist eine Verzögerung von ca. 4 Arbeitstagen durch die Felslinsen. Gegenmassnahmen sind eingeleitet.')
 
 pdf.add_page()
-h1('2. Terminuebersicht')
-p('Aktueller Stand der Meilensteine:')
-pdf.set_font('Helvetica','B',9)
-cw = (pdf.w-40)/4
-for hdr in ['Nr.','Meilenstein','Termin','Status']:
-    pdf.cell(cw,7,hdr,border=1,align='C')
-pdf.ln()
-pdf.set_font('Helvetica','',9)
-for row in [['M01','Baubewilligung','20.01.2026','Erledigt'],['M02','Abbruch','15.03.2026','Erledigt'],['M03','Baugrube fertig','30.06.2026','Laufend'],['M04','Rohbau UG','30.09.2026','Offen'],['M05','Rohbau gesamt','30.04.2027','Offen']]:
-    for c in row: pdf.cell(cw,6,c,border=1)
-    pdf.ln()
-pdf.ln(5)
-h2('Terminabweichungen')
-p('Die Erdarbeiten liegen aktuell ca. 4 Arbeitstage hinter dem Plan. Ursache sind Felslinsen im Untergrund, die mit hydraulischem Meissel abgebaut werden muessen. Ab KW 17 ist ein zusaetzlicher Bagger im Einsatz. Prognose: Rueckstand kann bis Ende Mai 2026 aufgeholt werden.')
+h1(pdf, '2. Terminübersicht')
+p(pdf, 'Aktueller Stand der Meilensteine:')
+add_table(pdf, ['Nr.','Meilenstein','Termin','Status'], [
+    ['M01','Baubewilligung','20.01.2026','Erledigt'],['M02','Abbruch','15.03.2026','Erledigt'],
+    ['M03','Baugrube fertig','30.06.2026','Laufend'],['M04','Rohbau UG','30.09.2026','Offen'],
+    ['M05','Rohbau gesamt','30.04.2027','Offen']])
+h2(pdf, 'Terminabweichungen')
+p(pdf, 'Die Erdarbeiten liegen aktuell ca. 4 Arbeitstage hinter dem Plan. Ursache sind Felslinsen im Untergrund, die mit hydraulischem Meissel abgebaut werden müssen. Ab KW 17 ist ein zusätzlicher Bagger im Einsatz. Prognose: Rückstand kann bis Ende Mai 2026 aufgeholt werden.')
 
 pdf.add_page()
-h1('3. Baufortschritt im Detail')
-h2('3.1 Abbrucharbeiten')
-p('Die Abbrucharbeiten wurden von der Eberhard Recycling AG termingerecht durchgefuehrt und am 15.03.2026 abgeschlossen. Insgesamt wurden ca. 4200 m3 Abbruchmaterial entsorgt, davon 78% recycelt (Betonrecycling). Die Altlastenuntersuchung ergab keine Belastungen.')
-h2('3.2 Baugrube und Verbau')
-p('Der Aushub der Baugrube ist zu ca. 65% abgeschlossen. Die Verbauarbeiten (rueckverankerte Bohrpfahlwand) verlaufen planmaessig. Die Inklinometermessungen zeigen Verformungen innerhalb der zulaessigen Grenzwerte.')
-p('Aushubvolumen bisher: ca. 14500 m3 von geschaetzten 22000 m3.')
-h2('3.3 Spezialtiefbau')
-p('26 von 42 Bohrpfaehlen sind hergestellt (62%). Die Integritaetspruefungen (Low-Strain-Test) an 8 Pfaehlen waren alle ohne Befund. Bei Pfahl Nr. 12 wurde ein Betonueberverbrauch von 18% festgestellt (Hohlraumbildung im Lockergestein). Die statische Unbedenklichkeit wurde durch den Tragwerksplaner bestaetigt.')
+h1(pdf, '3. Baufortschritt im Detail')
+h2(pdf, '3.1 Abbrucharbeiten')
+p(pdf, 'Die Abbrucharbeiten wurden von der Eberhard Recycling AG termingerecht durchgeführt und am 15.03.2026 abgeschlossen. Insgesamt wurden ca. 4\'200 m³ Abbruchmaterial entsorgt, davon 78% recycelt (Betonrecycling). Die Altlastenuntersuchung ergab keine Belastungen.')
+h2(pdf, '3.2 Baugrube und Verbau')
+p(pdf, 'Der Aushub der Baugrube ist zu ca. 65% abgeschlossen. Die Verbauarbeiten (rückverankerte Bohrpfahlwand) verlaufen planmässig. Die Inklinometermessungen zeigen Verformungen innerhalb der zulässigen Grenzwerte.')
+p(pdf, 'Aushubvolumen bisher: ca. 14\'500 m³ von geschätzten 22\'000 m³.')
+h2(pdf, '3.3 Spezialtiefbau')
+p(pdf, '26 von 42 Bohrpfählen sind hergestellt (62%). Die Integritätsprüfungen (Low-Strain-Test) an 8 Pfählen waren alle ohne Befund. Bei Pfahl Nr. 12 wurde ein Betonüberverbrauch von 18% festgestellt (Hohlraumbildung im Lockergestein). Die statische Unbedenklichkeit wurde durch den Tragwerksplaner bestätigt.')
 
 pdf.add_page()
-h1('4. Kostenuebersicht')
-p('Kostenstand per 30.04.2026:')
-pdf.set_font('Helvetica','B',9)
-for hdr in ['Position','Budget (CHF)','Ist (CHF)','Prognose (CHF)']:
-    pdf.cell(cw,7,hdr,border=1,align='C')
-pdf.ln()
-pdf.set_font('Helvetica','',9)
-for row in [['Abbruch','480\'000','480\'000','480\'000'],['Baumeister','14\'200\'000','1\'180\'000','14\'350\'000'],['Spezialtiefbau','2\'800\'000','840\'000','2\'848\'000'],['Baustelleneinr.','350\'000','335\'000','345\'000'],['Summe bisher','17\'830\'000','2\'835\'000','18\'023\'000']]:
-    for c in row: pdf.cell(cw,6,c,border=1)
-    pdf.ln()
-pdf.ln(5)
-p('Die Gesamtkosten liegen aktuell 1.1% ueber dem Budget. Die Ueberschreitung resultiert aus den Mehrkosten fuer Felsabbau (NT-001, noch in Pruefung) und der hoeheren Grundwasserhaltung (NT-002, CHF 48\'000 genehmigt).')
+h1(pdf, '4. Kostenübersicht')
+p(pdf, 'Kostenstand per 30.04.2026:')
+add_table(pdf, ['Position','Budget (CHF)','Ist (CHF)','Prognose (CHF)'], [
+    ['Abbruch','480\'000','480\'000','480\'000'],['Baumeister','14\'200\'000','1\'180\'000','14\'350\'000'],
+    ['Spezialtiefbau','2\'800\'000','840\'000','2\'848\'000'],['Baustelleneinr.','350\'000','335\'000','345\'000'],
+    ['Summe bisher','17\'830\'000','2\'835\'000','18\'023\'000']])
+p(pdf, 'Die Gesamtkosten liegen aktuell 1.1% über dem Budget. Die Überschreitung resultiert aus den Mehrkosten für Felsabbau (NT-001, noch in Prüfung) und der höheren Grundwasserhaltung (NT-002, CHF 48\'000 genehmigt).')
 
 pdf.add_page()
-h1('5. Qualitaet und Maengel')
-p('Durchgefuehrte Qualitaetspruefungen:')
-for c in ['Verdichtungspruefung Baugrubensohle Abschnitt A: Bestanden','Integritaetspruefung Bohrpfaehle Nr. 5, 8, 12, 15, 18, 20, 23, 26: Alle i.O.','Betonpruefung: 6 Wuerfel entnommen, 28-Tage-Pruefung ausstehend','Inklinometermessungen: Alle Verformungen im Toleranzbereich']:
-    bullet(c)
+h1(pdf, '5. Qualität und Mängel')
+p(pdf, 'Durchgeführte Qualitätsprüfungen:')
+for c in ['Verdichtungsprüfung Baugrubensohle Abschnitt A: Bestanden','Integritätsprüfung Bohrpfähle Nr. 5, 8, 12, 15, 18, 20, 23, 26: Alle i.O.','Betonprüfung: 6 Würfel entnommen, 28-Tage-Prüfung ausstehend','Inklinometermessungen: Alle Verformungen im Toleranzbereich']:
+    bullet(pdf, c)
 pdf.ln(3)
-h2('Offene Maengel')
-p('M-001: Bohrpfahl Nr. 12 Betonueberverbrauch - In Pruefung')
-p('M-002: Verbau Achse 6 Horizontalverschiebung - Offen')
-p('M-003: Entwässerungsrinne Zufahrt - Behoben')
+h2(pdf, 'Offene Mängel')
+p(pdf, 'M-001: Bohrpfahl Nr. 12 Betonüberverbrauch – In Prüfung')
+p(pdf, 'M-002: Verbau Achse 6 Horizontalverschiebung – Offen')
+p(pdf, 'M-003: Entwässerungsrinne Zufahrt – Behoben')
 
-h1('6. Arbeitssicherheit')
-p('Im Berichtszeitraum wurden keine Arbeitsunfaelle registriert. 4 SIBE-Begehungen durchgefuehrt. 18 Erstunterweisungen. 1 Verstoss gegen Helmtragepflicht (muendliche Ermahnung).')
+h1(pdf, '6. Arbeitssicherheit')
+p(pdf, 'Im Berichtszeitraum wurden keine Arbeitsunfälle registriert. 4 SIBE-Begehungen durchgeführt. 18 Erstunterweisungen. 1 Verstoss gegen Helmtragepflicht (mündliche Ermahnung).')
 
 pdf.add_page()
-h1('8. Risiken und Massnahmen')
-pdf.set_font('Helvetica','B',9)
-for hdr in ['Risiko','Wahrsch.','Auswirkung','Massnahme']:
-    pdf.cell(cw,7,hdr,border=1,align='C')
-pdf.ln()
-pdf.set_font('Helvetica','',9)
-for row in [['Weitere Felslinsen','Mittel','Terminverzug','Meissel bereit'],['Grundwasser','Gering','Mehrkosten','Zusatzpumpen'],['Lieferengpaesse','Gering','Terminverzug','Fruehbestellung'],['Laermklagen','Mittel','Bauverzoeg.','Schutzwand erhoehen']]:
-    for c in row: pdf.cell(cw,6,c,border=1)
-    pdf.ln()
-pdf.ln(5)
+h1(pdf, '8. Risiken und Massnahmen')
+add_table(pdf, ['Risiko','Wahrsch.','Auswirkung','Massnahme'], [
+    ['Weitere Felslinsen','Mittel','Terminverzug','Meissel bereit'],['Grundwasser','Gering','Mehrkosten','Zusatzpumpen'],
+    ['Lieferengpässe','Gering','Terminverzug','Frühbestellung'],['Lärmklagen','Mittel','Bauverzög.','Schutzwand erhöhen']])
 
-h1('9. Ausblick Mai 2026')
-for o in ['Fertigstellung Aushub Abschnitt C und D','Restliche 16 Bohrpfaehle herstellen','Beginn Sauberkeitsschicht und Bodenplatte (Abschnitt A)','Erste Drohnen-Dokumentation','Naechste Bausitzung: 07.05.2026']:
-    bullet(o)
+h1(pdf, '9. Ausblick Mai 2026')
+for o in ['Fertigstellung Aushub Abschnitt C und D','Restliche 16 Bohrpfähle herstellen','Beginn Sauberkeitsschicht und Bodenplatte (Abschnitt A)','Erste Drohnen-Dokumentation','Nächste Bausitzung: 07.05.2026']:
+    bullet(pdf, o)
 pdf.ln(5)
-p('Zuerich, den 30.04.2026')
+p(pdf, 'Zürich, den 30.04.2026')
 pdf.ln(8)
+pdf.set_font('Arial','',10)
 pdf.cell(0,6,'_________________________',new_x='LMARGIN',new_y='NEXT')
 pdf.cell(0,6,'Dipl. Bauing. ETH Marco Keller',new_x='LMARGIN',new_y='NEXT')
 pdf.cell(0,6,'Implenia Schweiz AG',new_x='LMARGIN',new_y='NEXT')
