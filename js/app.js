@@ -45,6 +45,10 @@
       css:  { icon: 'file-code', color: '#264DE4', category: 'text' },
       xml:  { icon: 'file-code', color: '#607D8B', category: 'text' },
       // Archives
+      // CAD
+      dwg:  { icon: 'ruler', color: '#0D47A1', category: 'cad' },
+      dxf:  { icon: 'ruler', color: '#0D47A1', category: 'cad' },
+      // Archives
       zip:  { icon: 'file-archive', color: '#FFA000', category: 'archive' },
       rar:  { icon: 'file-archive', color: '#FFA000', category: 'archive' },
     };
@@ -1006,6 +1010,7 @@
       content.innerHTML = '<div class="preview-loading"><i data-lucide="loader-2" class="spin"></i><span>Loading preview...</span></div>';
       content.classList.remove('viewer-content-media');
       this._destroyZoom();
+      if (typeof DwgViewer !== 'undefined') DwgViewer.cleanup();
       modal.hidden = false;
       lucide.createIcons({ nodes: [content] });
 
@@ -1020,12 +1025,14 @@
         var data = await Storage.getData(file.id);
         var ft = getFileType(file.name);
 
-        // Images render directly on dark bg, no white paper
-        if (ft.category === 'image') {
+        // Images and CAD render directly on dark bg, no white paper
+        if (ft.category === 'image' || ft.category === 'cad') {
           content.classList.add('viewer-content-media');
         }
 
-        if (ft.category === 'document') {
+        if (ft.category === 'cad') {
+          await this.renderDwg(data, content, file.name);
+        } else if (ft.category === 'document') {
           await this.renderDocx(data, content);
         } else if (ft.category === 'spreadsheet') {
           await this.renderXlsx(data, content);
@@ -1051,6 +1058,7 @@
       this.siblingFiles = [];
       this.currentIndex = -1;
       this._destroyZoom();
+      if (typeof DwgViewer !== 'undefined') DwgViewer.cleanup();
     },
 
     async prev() {
@@ -1242,6 +1250,19 @@
       var controls = $('viewer-zoom-controls');
       if (controls) controls.hidden = true;
       this._zoom = null;
+    },
+
+    async renderDwg(arrayBuffer, container, fileName) {
+      if (typeof DwgViewer === 'undefined') {
+        container.innerHTML = '<div class="preview-unsupported"><h3>DWG viewer not loaded</h3><p>The DWG viewer library could not be loaded.</p></div>';
+        return;
+      }
+      container.innerHTML = '';
+      container.style.padding = '0';
+      container.style.maxWidth = 'none';
+      container.style.width = '100%';
+      container.style.height = '100%';
+      await DwgViewer.render(arrayBuffer, container, fileName);
     },
 
     renderImage(arrayBuffer, mimeType, container) {
@@ -1941,6 +1962,8 @@
           jpg: 'image/jpeg',
           jpeg: 'image/jpeg',
           png: 'image/png',
+          dwg: 'application/acad',
+          dxf: 'application/dxf',
           md: 'text/markdown',
           csv: 'text/csv',
           txt: 'text/plain'
@@ -1980,6 +2003,8 @@
       await fetchFile(base + '01 Planung/Raumprogramm.xlsx', 'Raumprogramm.xlsx', planung);
       await fetchFile(base + '01 Planung/Terminplan.xlsx', 'Terminplan.xlsx', planung);
       await fetchFile(base + '01 Planung/Gestaltungskonzept.docx', 'Gestaltungskonzept.docx', planung);
+      await fetchFile(base + '01 Planung/Grundriss_EG.dwg', 'Grundriss_EG.dwg', planung);
+      await fetchFile(base + '01 Planung/Fassade_Detail.dwg', 'Fassade_Detail.dwg', planung);
 
       // 02 Bewilligungen
       await fetchFile(base + '02 Bewilligungen/Baubewilligung.pdf', 'Baubewilligung.pdf', bewillig);
