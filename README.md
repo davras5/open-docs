@@ -17,11 +17,7 @@
   <img src="https://img.shields.io/badge/prototype-v0.1-orange.svg" alt="Prototype">
 </p>
 
-<p align="center">
-  <a href="https://davras5.github.io/open-docs/"><strong>Live Demo</strong></a> &nbsp;&middot;&nbsp;
-  <a href="https://github.com/davras5/open-docs">GitHub</a>
-</p>
-
+Live Demo: https://davras5.github.io/open-docs/
 ---
 
 ## What is OpenDocs?
