@@ -1055,8 +1055,16 @@
       modal.dataset.fileId = file.id;
 
       // Attach document metadata if available
-      if (!file._docMeta && file._metaId && Metadata.data) {
-        file._docMeta = Metadata.getDocById(file._metaId);
+      if (!file._docMeta && Metadata.data) {
+        if (file._metaId) {
+          file._docMeta = Metadata.getDocById(file._metaId);
+        }
+        // Fallback: match by filename
+        if (!file._docMeta) {
+          file._docMeta = Metadata.data.documents.find(function(d) {
+            return d.fileName === file.name;
+          }) || null;
+        }
       }
       // Update URL to document slug
       if (file._docMeta && file._docMeta.slug) {
