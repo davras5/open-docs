@@ -1712,7 +1712,6 @@
 
     if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
     if (settingsBackBtn) settingsBackBtn.addEventListener('click', closeSettings);
-    }
 
     // -- Context menu: close on click outside --
     document.addEventListener('click', function () {
