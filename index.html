@@ -7,6 +7,7 @@
   <meta name="description" content="OpenDocs is an open-source SharePoint alternative for managing, previewing, and sharing documents.">
 
   <!-- Styles -->
+  <link rel="stylesheet" href="css/tokens.css">
   <link rel="stylesheet" href="css/style.css">
 
   <!-- Dependencies (CDN) -->
@@ -141,6 +142,11 @@
               <i data-lucide="layout-grid"></i>
             </button>
           </div>
+
+          <button class="btn btn-secondary" id="toolbar-share-btn" type="button" title="Share selected file">
+            <i data-lucide="share-2"></i>
+            <span>Share</span>
+          </button>
 
           <div class="sort-dropdown" id="sort-dropdown">
             <button class="btn btn-secondary" id="sort-btn" type="button" aria-haspopup="listbox">

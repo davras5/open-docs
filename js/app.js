@@ -1895,6 +1895,18 @@
       infoClose.addEventListener('click', function () { if (infoPanel) infoPanel.hidden = true; });
     }
 
+    // -- Toolbar share button --
+    var toolbarShareBtn = $('toolbar-share-btn');
+    if (toolbarShareBtn) {
+      toolbarShareBtn.addEventListener('click', function () {
+        if (UI.selectedFile) {
+          FileOps.share(UI.selectedFile);
+        } else {
+          UI.showToast('Select a file to share', 'info');
+        }
+      });
+    }
+
     // -- Share modal: copy link --
     var copyLinkBtn = $('copy-link-btn');
     if (copyLinkBtn) {

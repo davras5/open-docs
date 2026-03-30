@@ -1,0 +1,289 @@
+/* ═══════════════════════════════════════════════════════
+   OpenDocs Design Tokens
+   A consistent, accessible design system.
+   ═══════════════════════════════════════════════════════ */
+
+:root {
+
+  /* ─── Color Primitives ─────────────────────────────────
+     Raw palette values. Never use these directly in
+     components — reference semantic tokens instead.
+     Naming: --{hue}-{shade}
+     ──────────────────────────────────────────────────── */
+
+  --slate-50:  #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+  --slate-950: #020617;
+
+  --blue-50:  #eff6ff;
+  --blue-100: #dbeafe;
+  --blue-500: #3b82f6;
+  --blue-600: #2563eb;
+  --blue-700: #1d4ed8;
+  --blue-800: #1e40af;
+
+  --red-50:   #fef2f2;
+  --red-500:  #ef4444;
+  --red-600:  #dc2626;
+  --red-700:  #b91c1c;
+
+  --green-50:  #f0fdf4;
+  --green-100: #dcfce7;
+  --green-500: #22c55e;
+  --green-600: #16a34a;
+  --green-800: #166534;
+
+  --amber-50:  #fffbeb;
+  --amber-100: #fef3c7;
+  --amber-500: #f59e0b;
+  --amber-700: #b45309;
+  --amber-800: #92400e;
+
+  --orange-50:  #fff7ed;
+  --orange-100: #ffedd5;
+  --orange-700: #c2410c;
+  --orange-800: #9a3412;
+
+  --violet-500: #8b5cf6;
+  --violet-600: #7c3aed;
+
+  /* ─── Semantic Colors ──────────────────────────────────
+     Meaningful names for UI contexts. Components should
+     only reference these tokens.
+     Naming: --color-{category}-{variant}
+     ──────────────────────────────────────────────────── */
+
+  /* Backgrounds */
+  --color-bg:            var(--slate-50);
+  --color-bg-surface:    #ffffff;
+  --color-bg-muted:      var(--slate-100);
+  --color-bg-hover:      var(--slate-50);
+  --color-bg-selected:   var(--blue-50);
+
+  /* Text */
+  --color-text:           var(--slate-800);
+  --color-text-secondary: var(--slate-500);
+  --color-text-muted:     var(--slate-400);
+  --color-text-inverse:   #ffffff;
+  --color-text-link:      var(--blue-600);
+
+  /* Borders */
+  --color-border:        var(--slate-200);
+  --color-border-hover:  var(--slate-300);
+  --color-border-focus:  var(--blue-600);
+
+  /* Primary (brand) */
+  --color-primary:        var(--blue-600);
+  --color-primary-hover:  var(--blue-700);
+  --color-primary-active: var(--blue-800);
+  --color-primary-light:  var(--blue-50);
+  --color-primary-ring:   rgba(37, 99, 235, 0.15);
+
+  /* Danger */
+  --color-danger:        var(--red-500);
+  --color-danger-hover:  var(--red-600);
+  --color-danger-light:  var(--red-50);
+
+  /* Success */
+  --color-success:       var(--green-600);
+  --color-success-light: var(--green-50);
+
+  /* Warning */
+  --color-warning:       var(--amber-500);
+  --color-warning-light: var(--amber-50);
+
+  /* Status badges — Naming: --color-status-{state}-{bg|text} */
+  --color-status-approved-bg:   var(--green-100);
+  --color-status-approved-text: var(--green-800);
+  --color-status-active-bg:     var(--blue-100);
+  --color-status-active-text:   var(--blue-800);
+  --color-status-pending-bg:    var(--amber-100);
+  --color-status-pending-text:  var(--amber-800);
+  --color-status-review-bg:     var(--orange-100);
+  --color-status-review-text:   var(--orange-800);
+  --color-status-default-bg:    var(--slate-100);
+  --color-status-default-text:  var(--slate-600);
+
+  /* File type icon colors */
+  --color-icon-doc:     #2B579A;
+  --color-icon-xls:     #217346;
+  --color-icon-pdf:     #D32F2F;
+  --color-icon-ppt:     #B7472A;
+  --color-icon-img:     #7B1FA2;
+  --color-icon-cad:     #0D47A1;
+  --color-icon-folder:  #FFA000;
+  --color-icon-default: #90A4AE;
+
+  /* ─── Typography ───────────────────────────────────────
+     System font stack with monospace fallback.
+     Scale based on major-third ratio (~1.25).
+     Naming: --text-{size}, --font-{weight}, --leading-{density}
+     ──────────────────────────────────────────────────── */
+
+  --font-family:      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-family-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+
+  --text-xs:   0.6875rem;
+  --text-sm:   0.8125rem;
+  --text-base: 0.875rem;
+  --text-md:   0.9375rem;
+  --text-lg:   1.125rem;
+  --text-xl:   1.25rem;
+  --text-2xl:  1.5rem;
+
+  --font-normal:   400;
+  --font-medium:   500;
+  --font-semibold: 600;
+  --font-bold:     700;
+
+  --leading-tight:   1.3;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.65;
+  --leading-loose:   1.8;
+
+  /* ─── Spacing ──────────────────────────────────────────
+     4px base unit. Naming: --space-{multiplier}
+     ──────────────────────────────────────────────────── */
+
+  --space-0:   0;
+  --space-1:   0.25rem;
+  --space-2:   0.5rem;
+  --space-3:   0.75rem;
+  --space-4:   1rem;
+  --space-5:   1.25rem;
+  --space-6:   1.5rem;
+  --space-8:   2rem;
+  --space-10:  2.5rem;
+  --space-12:  3rem;
+  --space-16:  4rem;
+
+  /* ─── Border Radius ────────────────────────────────────
+     Naming: --radius-{size}
+     ──────────────────────────────────────────────────── */
+
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
+  --radius-xl:   12px;
+  --radius-full: 9999px;
+
+  /* ─── Elevation ────────────────────────────────────────
+     Box-shadow layers. Naming: --shadow-{size}
+     ──────────────────────────────────────────────────── */
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.15);
+
+  /* ─── Z-Index Layers ───────────────────────────────────
+     Stacking order. Naming: --z-{layer}
+     ──────────────────────────────────────────────────── */
+
+  --z-base:     1;
+  --z-sticky:   10;
+  --z-navbar:   50;
+  --z-sidebar:  80;
+  --z-dropdown: 100;
+  --z-context:  150;
+  --z-viewer:   200;
+  --z-modal:    300;  /* Above viewer so share/folder modals overlay it */
+  --z-overlay:  400;
+  --z-toast:    500;
+
+  /* ─── Motion ───────────────────────────────────────────
+     Duration and easing curves.
+     Naming: --duration-{speed}, --easing-{type}
+     ──────────────────────────────────────────────────── */
+
+  --duration-fast:   150ms;
+  --duration-normal: 200ms;
+  --duration-slow:   300ms;
+  --easing-default:  cubic-bezier(0.4, 0, 0.2, 1);
+  --easing-in:       cubic-bezier(0.4, 0, 1, 1);
+  --easing-out:      cubic-bezier(0, 0, 0.2, 1);
+
+  /* ─── Sizing ───────────────────────────────────────────
+     Touch targets, component dimensions, content widths.
+     Naming: --size-{element}, --width-{purpose}
+     ──────────────────────────────────────────────────── */
+
+  /* Touch targets */
+  --size-touch:    2.75rem;
+  --size-touch-sm: 2.25rem;
+
+  /* Component sizes */
+  --size-navbar:  3.5rem;
+  --size-sidebar: 16.25rem;
+  --size-btn:     2.5rem;
+  --size-btn-sm:  2rem;
+  --size-input:   2.5rem;
+  --size-avatar:  2rem;
+  --size-icon:    1.25rem;
+  --size-icon-sm: 1rem;
+
+  /* Content widths */
+  --width-content-sm: 360px;
+  --width-content-md: 480px;
+  --width-content-lg: 720px;
+  --width-content-xl: 900px;
+  --width-editor:     800px;
+
+  /* Breakpoints (reference only — not usable in media queries) */
+  --breakpoint-sm: 480px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+
+  /* ─── Viewer ───────────────────────────────────────────
+     Dark overlay document viewer.
+     Naming: --viewer-{element}
+     ──────────────────────────────────────────────────── */
+
+  --viewer-bg:             rgba(9, 12, 20, 0.94);
+  --viewer-text:           #ffffff;
+  --viewer-text-secondary: rgba(255, 255, 255, 0.6);
+  --viewer-text-muted:     rgba(255, 255, 255, 0.4);
+  --viewer-btn-text:       rgba(255, 255, 255, 0.75);
+  --viewer-btn-hover:      rgba(255, 255, 255, 0.1);
+  --viewer-nav-bg:         rgba(255, 255, 255, 0.06);
+  --viewer-nav-hover:      rgba(255, 255, 255, 0.15);
+}
+
+/* ─── Dark Theme ───────────────────────────────────────
+   Overrides semantic tokens for dark mode.
+   Applied via .dark-theme class on a parent element.
+   ──────────────────────────────────────────────────── */
+
+.dark-theme {
+  --color-bg:            var(--slate-900);
+  --color-bg-surface:    var(--slate-800);
+  --color-bg-muted:      var(--slate-700);
+  --color-bg-hover:      var(--slate-700);
+  --color-bg-selected:   #1e3a5f;
+
+  --color-text:           var(--slate-100);
+  --color-text-secondary: var(--slate-400);
+  --color-text-muted:     var(--slate-500);
+  --color-text-inverse:   var(--slate-900);
+
+  --color-border:        var(--slate-700);
+  --color-border-hover:  var(--slate-600);
+  --color-border-focus:  #60a5fa;
+
+  --color-primary-ring:  rgba(96, 165, 250, 0.2);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
