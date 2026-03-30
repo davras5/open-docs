@@ -1938,6 +1938,44 @@ img {
   flex-shrink: 0;
 }
 
+.settings-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 24px;
+  text-align: center;
+  color: #94a3b8;
+}
+
+.settings-placeholder-icon {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 20px;
+  color: #cbd5e1;
+}
+
+.settings-placeholder h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.settings-placeholder p {
+  font-size: 14px;
+  max-width: 360px;
+  line-height: 1.6;
+}
+
+.dark-theme .settings-placeholder-icon {
+  color: #475569;
+}
+
+.dark-theme .settings-placeholder h2 {
+  color: #94a3b8;
+}
+
 /* Toggle Switch */
 
 .toggle-switch {
