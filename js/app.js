@@ -1674,15 +1674,104 @@
 
     // -- Theme toggle --
     var themeToggle = $('theme-toggle');
+    var isDark = localStorage.getItem('opendocs-theme') === 'dark';
+    if (isDark) document.body.classList.add('dark-theme');
+
+    function syncDarkMode(enabled) {
+      document.body.classList.toggle('dark-theme', enabled);
+      localStorage.setItem('opendocs-theme', enabled ? 'dark' : 'light');
+      var settingCheckbox = $('setting-dark-mode');
+      if (settingCheckbox) settingCheckbox.checked = enabled;
+    }
+
     if (themeToggle) {
       themeToggle.addEventListener('click', function () {
-        document.body.classList.toggle('dark-theme');
-        localStorage.setItem('opendocs-theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light');
+        syncDarkMode(!document.body.classList.contains('dark-theme'));
       });
-      // Restore theme
-      if (localStorage.getItem('opendocs-theme') === 'dark') {
-        document.body.classList.add('dark-theme');
-      }
+    }
+
+    // -- Settings --
+    var settingsBtn = $('settings-btn');
+    var settingsView = $('settings-view');
+    var settingsBackBtn = $('settings-back-btn');
+    var mainContent = $('main-content');
+    var sidebar = $('sidebar');
+
+    function openSettings() {
+      if (mainContent) mainContent.hidden = true;
+      if (sidebar) sidebar.hidden = true;
+      if (settingsView) settingsView.hidden = false;
+      // Sync controls
+      var darkCheckbox = $('setting-dark-mode');
+      if (darkCheckbox) darkCheckbox.checked = document.body.classList.contains('dark-theme');
+      var viewSelect = $('setting-default-view');
+      if (viewSelect) viewSelect.value = UI.currentView;
+      // Update storage info
+      Storage.getStorageUsed().then(function (used) {
+        var info = $('settings-storage-info');
+        var fill = $('settings-storage-fill');
+        if (info) info.textContent = formatSize(used) + ' of ' + formatSize(STORAGE_LIMIT) + ' used';
+        if (fill) fill.style.width = Math.min(100, (used / STORAGE_LIMIT) * 100).toFixed(1) + '%';
+      });
+    }
+
+    function closeSettings() {
+      if (settingsView) settingsView.hidden = true;
+      if (mainContent) mainContent.hidden = false;
+      if (sidebar) sidebar.hidden = false;
+    }
+
+    if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
+    if (settingsBackBtn) settingsBackBtn.addEventListener('click', closeSettings);
+
+    // Settings: dark mode toggle
+    var settingDarkMode = $('setting-dark-mode');
+    if (settingDarkMode) {
+      settingDarkMode.addEventListener('change', function () {
+        syncDarkMode(settingDarkMode.checked);
+      });
+    }
+
+    // Settings: default view
+    var settingDefaultView = $('setting-default-view');
+    if (settingDefaultView) {
+      settingDefaultView.addEventListener('change', function () {
+        UI.toggleView(settingDefaultView.value);
+      });
+    }
+
+    // Settings: clear data
+    var settingClearData = $('setting-clear-data');
+    if (settingClearData) {
+      settingClearData.addEventListener('click', async function () {
+        if (!confirm('Delete all files and reset the application? This cannot be undone.')) return;
+        await fileStore.clear();
+        await dataStore.clear();
+        localStorage.removeItem('opendocs-seeded');
+        UI.showToast('All data cleared', 'success');
+        closeSettings();
+        UI.currentFolder = null;
+        UI.renderBreadcrumb();
+        UI.renderFileList();
+        UI.updateStorageBar();
+      });
+    }
+
+    // Settings: reload demo
+    var settingReloadDemo = $('setting-reload-demo');
+    if (settingReloadDemo) {
+      settingReloadDemo.addEventListener('click', async function () {
+        if (!confirm('Reset all data and reload the demo project?')) return;
+        await fileStore.clear();
+        await dataStore.clear();
+        localStorage.removeItem('opendocs-seeded');
+        closeSettings();
+        await seedDemoData();
+        UI.currentFolder = null;
+        UI.renderBreadcrumb();
+        UI.renderFileList();
+        UI.updateStorageBar();
+      });
     }
 
     // -- Context menu: close on click outside --
