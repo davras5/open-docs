@@ -1988,7 +1988,13 @@
         if (UI.selectedFile) {
           FileOps.share(UI.selectedFile);
         } else {
-          UI.showToast('Select a file to share', 'info');
+          // Share current folder URL
+          var url = location.origin + location.pathname + (location.hash || '#/');
+          navigator.clipboard.writeText(url).then(function () {
+            UI.showToast('Folder link copied to clipboard', 'success');
+          }).catch(function () {
+            UI.showToast('Folder link: ' + url, 'info');
+          });
         }
       });
     }
