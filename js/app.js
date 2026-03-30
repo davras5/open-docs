@@ -273,14 +273,15 @@
     isSearching: false,
 
     /** Main entry point: render the file list for current folder/section. */
+    _renderVersion: 0, // guard against concurrent renders
+
     async renderFileList() {
       var browser = $('file-browser');
       var emptyState = $('empty-state');
       if (!browser) return;
 
-      // Remove previous file items (keep the empty state element)
-      var existing = browser.querySelectorAll('.file-card, .file-row, .file-list-table');
-      existing.forEach(function (el) { el.remove(); });
+      // Bump version so stale async calls are discarded
+      var thisRender = ++this._renderVersion;
 
       var options = {
         sortBy: this.sortBy,
@@ -305,6 +306,13 @@
       } else {
         files = await Storage.listFiles(this.currentFolder, options);
       }
+
+      // If a newer render was kicked off while we were waiting, bail out
+      if (thisRender !== this._renderVersion) return;
+
+      // Clear previous items AFTER async work, right before painting
+      var existing = browser.querySelectorAll('.file-card, .file-row, .file-list-table');
+      existing.forEach(function (el) { el.remove(); });
 
       if (files.length === 0) {
         if (emptyState) {
@@ -1542,8 +1550,9 @@
   // ---------------------------------------------------------------------------
 
   async function seedDemoData() {
-    // Only seed once
+    // Only seed once — set flag immediately to prevent duplicate runs on reload
     if (localStorage.getItem('opendocs-seeded')) return;
+    localStorage.setItem('opendocs-seeded', '1');
 
     var enc = new TextEncoder();
 
@@ -2204,8 +2213,6 @@
         'Fr. Petra Wagner;Haustechnik Süd GmbH;HLKS;wagner@ht-sued.de;089 22222-35;0174 222 3355\n',
         projekt);
 
-      // Mark as seeded
-      localStorage.setItem('opendocs-seeded', '1');
       UI.showToast('Demo-Projekt geladen: Neubau Bürogebäude München', 'success');
 
     } catch (err) {
