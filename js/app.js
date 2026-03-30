@@ -2383,9 +2383,30 @@
     if (localStorage.getItem('opendocs-seeded')) return;
     localStorage.setItem('opendocs-seeded', '1');
 
+    // Show loading indicator in the file browser
+    var emptyState = $('empty-state');
+    if (emptyState) {
+      var title = emptyState.querySelector('.empty-state-title');
+      var text = emptyState.querySelector('.empty-state-text');
+      var icon = emptyState.querySelector('.empty-state-icon');
+      if (icon) icon.setAttribute('data-lucide', 'loader-2');
+      if (icon) icon.classList.add('spin');
+      if (title) title.textContent = 'Loading demo project...';
+      if (text) text.textContent = 'Fetching files from server';
+      emptyState.hidden = false;
+      lucide.createIcons({ nodes: [emptyState] });
+    }
+
     var meta = await Metadata.load();
     if (!meta) {
       console.warn('No metadata.json — skipping seed');
+      if (emptyState) {
+        var icon2 = emptyState.querySelector('.empty-state-icon');
+        if (icon2) { icon2.setAttribute('data-lucide', 'cloud-upload'); icon2.classList.remove('spin'); }
+        if (title) title.textContent = 'No files yet';
+        if (text) text.textContent = 'Drop files here or click Upload';
+        lucide.createIcons({ nodes: [emptyState] });
+      }
       return;
     }
 
@@ -2419,8 +2440,11 @@
         png: 'image/png', dwg: 'application/acad', dxf: 'application/dxf'
       };
 
-      for (var i = 0; i < meta.documents.length; i++) {
+      var total = meta.documents.length;
+      for (var i = 0; i < total; i++) {
         var doc = meta.documents[i];
+        // Update loading progress
+        if (text) text.textContent = 'Loading file ' + (i + 1) + ' of ' + total + '...';
         try {
           var resp = await fetch(base + doc.filePath);
           if (!resp.ok) continue;
