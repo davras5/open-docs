@@ -1900,6 +1900,9 @@
           xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           pdf: 'application/pdf',
           svg: 'image/svg+xml',
+          jpg: 'image/jpeg',
+          jpeg: 'image/jpeg',
+          png: 'image/png',
           md: 'text/markdown',
           csv: 'text/csv',
           txt: 'text/plain'
@@ -1921,68 +1924,73 @@
     try {
       var base = 'demo-files/';
 
-      // Root project folder
-      var projekt = await folder('Projekt Neubau Bürogebäude München');
+      // Root project folder — Swiss construction project
+      var projekt = await folder('Überbauung Seefeld Zürich');
 
       // Subfolders
-      var planung       = await folder('01 Planung', projekt);
-      var genehmigungen = await folder('02 Genehmigungen', projekt);
-      var ausfuehrung   = await folder('03 Bauausführung', projekt);
-      var kosten        = await folder('04 Kostenplanung', projekt);
-      var protokolle    = await folder('05 Protokolle', projekt);
-      var fotos         = await folder('06 Fotos', projekt);
-      var vertraege     = await folder('07 Verträge', projekt);
-      var sicherheit    = await folder('08 Arbeitssicherheit', projekt);
+      var planung     = await folder('01 Planung', projekt);
+      var bewillig    = await folder('02 Bewilligungen', projekt);
+      var ausfuehrung = await folder('03 Bauausführung', projekt);
+      var kosten      = await folder('04 Kosten', projekt);
+      var protokolle  = await folder('05 Protokolle', projekt);
+      var fotos       = await folder('06 Fotos', projekt);
+      var vertraege   = await folder('07 Verträge', projekt);
+      var sibe        = await folder('08 SIBE', projekt);
 
-      // Fetch all files from demo-files/
-      await fetchFile(base + '01 Planung/Projektbeschreibung.docx', 'Projektbeschreibung.docx', planung);
+      // 01 Planung
+      await fetchFile(base + '01 Planung/Projektbeschrieb.docx', 'Projektbeschrieb.docx', planung);
       await fetchFile(base + '01 Planung/Raumprogramm.xlsx', 'Raumprogramm.xlsx', planung);
-      await fetchFile(base + '01 Planung/Terminplan_Uebersicht.pdf', 'Terminplan_Übersicht.pdf', planung);
-      await fetchFile(base + '01 Planung/Architekturbriefing.docx', 'Architekturbriefing.docx', planung);
+      await fetchFile(base + '01 Planung/Terminplan.xlsx', 'Terminplan.xlsx', planung);
+      await fetchFile(base + '01 Planung/Gestaltungskonzept.docx', 'Gestaltungskonzept.docx', planung);
 
-      await fetchFile(base + '02 Genehmigungen/Baugenehmigung_Bescheid.pdf', 'Baugenehmigung_Bescheid.pdf', genehmigungen);
-      await fetchFile(base + '02 Genehmigungen/Umweltvertraeglichkeitspruefung.docx', 'Umweltverträglichkeitsprüfung.docx', genehmigungen);
-      await fetchFile(base + '02 Genehmigungen/Brandschutzkonzept_Entwurf.docx', 'Brandschutzkonzept_Entwurf.docx', genehmigungen);
+      // 02 Bewilligungen
+      await fetchFile(base + '02 Bewilligungen/Baubewilligung.pdf', 'Baubewilligung.pdf', bewillig);
+      await fetchFile(base + '02 Bewilligungen/Brandschutzkonzept.docx', 'Brandschutzkonzept.docx', bewillig);
+      await fetchFile(base + '02 Bewilligungen/UVB_Kurzfassung.docx', 'UVB_Kurzfassung.docx', bewillig);
 
-      await fetchFile(base + '03 Bauausfuehrung/Baustellenordnung.pdf', 'Baustellenordnung.pdf', ausfuehrung);
-      await fetchFile(base + '03 Bauausfuehrung/Nachunternehmer_Uebersicht.xlsx', 'Nachunternehmer_Übersicht.xlsx', ausfuehrung);
-      await fetchFile(base + '03 Bauausfuehrung/Bautagesbericht_2026-03-15.docx', 'Bautagesbericht_2026-03-15.docx', ausfuehrung);
-      await fetchFile(base + '03 Bauausfuehrung/Maengelliste.xlsx', 'Mängelliste.xlsx', ausfuehrung);
+      // 03 Bauausführung
+      await fetchFile(base + '03 Bauausführung/Baustellenordnung.pdf', 'Baustellenordnung.pdf', ausfuehrung);
+      await fetchFile(base + '03 Bauausführung/Unternehmerverzeichnis.xlsx', 'Unternehmerverzeichnis.xlsx', ausfuehrung);
+      await fetchFile(base + '03 Bauausführung/Bautagesbericht_2026-04-15.docx', 'Bautagesbericht_2026-04-15.docx', ausfuehrung);
+      await fetchFile(base + '03 Bauausführung/Mängelliste.xlsx', 'Mängelliste.xlsx', ausfuehrung);
 
-      await fetchFile(base + '04 Kostenplanung/Kostenschaetzung_DIN276.xlsx', 'Kostenschätzung_DIN276.xlsx', kosten);
-      await fetchFile(base + '04 Kostenplanung/Zahlungsplan_2026.xlsx', 'Zahlungsplan_2026.xlsx', kosten);
-      await fetchFile(base + '04 Kostenplanung/Nachtragsforderungen.docx', 'Nachtragsforderungen.docx', kosten);
+      // 04 Kosten
+      await fetchFile(base + '04 Kosten/Kostenvoranschlag_BKP.xlsx', 'Kostenvoranschlag_BKP.xlsx', kosten);
+      await fetchFile(base + '04 Kosten/Zahlungsplan_2026.xlsx', 'Zahlungsplan_2026.xlsx', kosten);
+      await fetchFile(base + '04 Kosten/Nachtragsverzeichnis.docx', 'Nachtragsverzeichnis.docx', kosten);
 
-      await fetchFile(base + '05 Protokolle/Baubesprechung_Nr12_2026-04-02.docx', 'Baubesprechung_Nr12_2026-04-02.docx', protokolle,
+      // 05 Protokolle
+      await fetchFile(base + '05 Protokolle/Bausitzung_Nr14_2026-04-16.docx', 'Bausitzung_Nr14_2026-04-16.docx', protokolle,
         { shared: true, sharedWith: [
-          { name: 'Thomas Berger', email: 'berger@bau-mg.de', permission: 'edit' },
-          { name: 'Martin Müller', email: 'mueller@ms-immo.de', permission: 'view' }
+          { name: 'Marco Keller', email: 'm.keller@implenia.com', permission: 'edit' },
+          { name: 'Stefan Meier', email: 's.meier@seefeld-immo.ch', permission: 'view' }
         ]});
-      await fetchFile(base + '05 Protokolle/Baubesprechung_Nr11_2026-03-26.docx', 'Baubesprechung_Nr11_2026-03-26.docx', protokolle);
-      await fetchFile(base + '05 Protokolle/Abnahmeprotokoll_Vorlage.docx', 'Abnahmeprotokoll_Vorlage.docx', protokolle);
+      await fetchFile(base + '05 Protokolle/Baufortschrittsbericht_Apr_2026.pdf', 'Baufortschrittsbericht_Apr_2026.pdf', protokolle);
 
-      await fetchFile(base + '06 Fotos/Baustellenuebersicht_2026-03-10.jpg', 'Baustellenübersicht_2026-03-10.jpg', fotos);
-      await fetchFile(base + '06 Fotos/Baugrube_von_oben_2026-04-01.jpg', 'Baugrube_von_oben_2026-04-01.jpg', fotos);
-      await fetchFile(base + '06 Fotos/Baustellenzufahrt_2026-03-05.jpg', 'Baustellenzufahrt_2026-03-05.jpg', fotos);
-      await fetchFile(base + '06 Fotos/Rohbauarbeiten_2026-03-25.jpg', 'Rohbauarbeiten_2026-03-25.jpg', fotos);
+      // 06 Fotos
+      await fetchFile(base + '06 Fotos/Baugrube_2026-04-01.jpg', 'Baugrube_2026-04-01.jpg', fotos);
+      await fetchFile(base + '06 Fotos/Bohrpfahlarbeiten_2026-03-25.jpg', 'Bohrpfahlarbeiten_2026-03-25.jpg', fotos);
+      await fetchFile(base + '06 Fotos/Baustellenzufahrt_2026-02-15.jpg', 'Baustellenzufahrt_2026-02-15.jpg', fotos);
+      await fetchFile(base + '06 Fotos/Verbauarbeiten_2026-04-10.jpg', 'Verbauarbeiten_2026-04-10.jpg', fotos);
 
-      await fetchFile(base + '07 Vertraege/Generalplanervertrag_Entwurf.docx', 'Generalplanervertrag_Entwurf.docx', vertraege);
-      await fetchFile(base + '07 Vertraege/Buergschaftsuebersicht.xlsx', 'Bürgschaftsübersicht.xlsx', vertraege);
+      // 07 Verträge
+      await fetchFile(base + '07 Verträge/Generalplanervertrag.docx', 'Generalplanervertrag.docx', vertraege);
+      await fetchFile(base + '07 Verträge/Bürgschaftsübersicht.xlsx', 'Bürgschaftsübersicht.xlsx', vertraege);
 
-      await fetchFile(base + '08 Arbeitssicherheit/SiGePlan_Uebersicht.docx', 'SiGePlan_Übersicht.docx', sicherheit);
-      await fetchFile(base + '08 Arbeitssicherheit/Unterweisungsnachweis_2026-03.xlsx', 'Unterweisungsnachweis_2026-03.xlsx', sicherheit);
-      await fetchFile(base + '08 Arbeitssicherheit/Unfallbericht_Vorlage.docx', 'Unfallbericht_Vorlage.docx', sicherheit);
+      // 08 SIBE
+      await fetchFile(base + '08 SIBE/Sicherheitskonzept.docx', 'Sicherheitskonzept.docx', sibe);
+      await fetchFile(base + '08 SIBE/Unterweisungsnachweis_2026.xlsx', 'Unterweisungsnachweis_2026.xlsx', sibe);
 
       // Root-level files
-      await fetchFile(base + 'Projektuebersicht.md', 'Projektübersicht.md', projekt,
+      await fetchFile(base + 'Projektübersicht.md', 'Projektübersicht.md', projekt,
         { shared: true, sharedWith: [
-          { name: 'Sabine Lechner', email: 'lechner@arch-lk.de', permission: 'edit' },
-          { name: 'Thomas Berger', email: 'berger@bau-mg.de', permission: 'edit' },
-          { name: 'Andrea Hofmann', email: 'hofmann@sigeko.de', permission: 'view' }
+          { name: 'Laura Brunner', email: 'brunner@be-arch.ch', permission: 'edit' },
+          { name: 'Marco Keller', email: 'm.keller@implenia.com', permission: 'edit' },
+          { name: 'Nina Frei', email: 'n.frei@sibe-zuerich.ch', permission: 'view' }
         ]});
       await fetchFile(base + 'Kontaktliste.xlsx', 'Kontaktliste.xlsx', projekt);
 
-      UI.showToast('Demo-Projekt geladen: Neubau Bürogebäude München', 'success');
+      UI.showToast('Demo-Projekt geladen: Überbauung Seefeld Zürich', 'success');
     } catch (err) {
       console.error('Seed failed:', err);
       UI.showToast('Demo-Daten konnten nicht geladen werden', 'error');
