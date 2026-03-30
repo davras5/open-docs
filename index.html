@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenDocs — Open-Source Document Management</title>
+  <meta name="description" content="OpenDocs is an open-source SharePoint alternative for managing, previewing, and sharing documents.">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Dependencies (CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- ========== TOP NAVBAR ========== -->
+  <nav class="navbar" id="navbar">
+    <div class="navbar-left">
+      <button class="sidebar-toggle" id="sidebar-toggle" type="button" aria-label="Toggle sidebar">
+        <i data-lucide="menu"></i>
+      </button>
+      <a href="/" class="navbar-brand">
+        <i data-lucide="file-text" class="brand-icon"></i>
+        <span class="brand-name">OpenDocs</span>
+      </a>
+    </div>
+
+    <div class="navbar-center">
+      <div class="search-wrapper" id="search-wrapper">
+        <i data-lucide="search" class="search-icon"></i>
+        <input
+          type="search"
+          id="search-input"
+          class="search-input"
+          placeholder="Search files and folders..."
+          aria-label="Search files and folders"
+        >
+      </div>
+    </div>
+
+    <div class="navbar-right">
+      <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle theme">
+        <i data-lucide="moon"></i>
+      </button>
+      <div class="user-avatar" id="user-avatar" title="David Mitchell">
+        <span>DM</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ========== LAYOUT WRAPPER ========== -->
+  <div class="app-layout" id="app-layout">
+
+    <!-- ========== LEFT SIDEBAR ========== -->
+    <aside class="sidebar" id="sidebar">
+      <nav class="sidebar-nav" aria-label="Main navigation">
+        <ul class="nav-list">
+          <li>
+            <button class="nav-item active" data-nav="my-files" type="button">
+              <i data-lucide="folder"></i>
+              <span class="nav-label">My Files</span>
+            </button>
+          </li>
+          <li>
+            <button class="nav-item" data-nav="shared" type="button">
+              <i data-lucide="users"></i>
+              <span class="nav-label">Shared with Me</span>
+            </button>
+          </li>
+          <li>
+            <button class="nav-item" data-nav="recent" type="button">
+              <i data-lucide="clock"></i>
+              <span class="nav-label">Recent</span>
+            </button>
+          </li>
+          <li>
+            <button class="nav-item" data-nav="trash" type="button">
+              <i data-lucide="trash-2"></i>
+              <span class="nav-label">Trash</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="storage-info">
+          <div class="storage-header">
+            <i data-lucide="hard-drive"></i>
+            <span class="nav-label">Storage Used</span>
+          </div>
+          <div class="storage-bar" role="progressbar" aria-valuenow="35" aria-valuemin="0" aria-valuemax="100">
+            <div class="storage-bar-fill" id="storage-bar-fill" style="width: 35%"></div>
+          </div>
+          <span class="storage-text nav-label" id="storage-text">3.5 GB of 10 GB used</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ========== MAIN CONTENT ========== -->
+    <main class="main-content" id="main-content">
+
+      <!-- Breadcrumb Bar -->
+      <div class="breadcrumb-bar" id="breadcrumb-bar" aria-label="Breadcrumb">
+        <ol class="breadcrumb-list" id="breadcrumb-list">
+          <li class="breadcrumb-item">
+            <button type="button" data-path="/">My Files</button>
+          </li>
+        </ol>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar" id="toolbar">
+        <div class="toolbar-left">
+          <button class="btn btn-primary" id="upload-btn" type="button">
+            <i data-lucide="upload"></i>
+            <span>Upload</span>
+          </button>
+          <input type="file" id="file-input" multiple hidden>
+
+          <button class="btn btn-secondary" id="new-folder-btn" type="button">
+            <i data-lucide="folder-plus"></i>
+            <span>New Folder</span>
+          </button>
+        </div>
+
+        <div class="toolbar-right">
+          <div class="view-toggle" role="group" aria-label="View mode">
+            <button class="icon-btn active" id="grid-view-btn" type="button" aria-label="Grid view" data-view="grid">
+              <i data-lucide="layout-grid"></i>
+            </button>
+            <button class="icon-btn" id="list-view-btn" type="button" aria-label="List view" data-view="list">
+              <i data-lucide="list"></i>
+            </button>
+          </div>
+
+          <div class="sort-dropdown" id="sort-dropdown">
+            <button class="btn btn-secondary" id="sort-btn" type="button" aria-haspopup="listbox">
+              <i data-lucide="arrow-up-down"></i>
+              <span>Sort</span>
+            </button>
+            <ul class="dropdown-menu" id="sort-menu" role="listbox" hidden>
+              <li role="option" data-sort="name-asc" class="dropdown-item active">Name (A-Z)</li>
+              <li role="option" data-sort="name-desc" class="dropdown-item">Name (Z-A)</li>
+              <li role="option" data-sort="date-desc" class="dropdown-item">Date (Newest)</li>
+              <li role="option" data-sort="date-asc" class="dropdown-item">Date (Oldest)</li>
+              <li role="option" data-sort="size-desc" class="dropdown-item">Size (Largest)</li>
+              <li role="option" data-sort="size-asc" class="dropdown-item">Size (Smallest)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- File Browser -->
+      <section class="file-browser" id="file-browser" aria-label="File browser">
+        <!-- Empty state (shown when no files) -->
+        <div class="empty-state" id="empty-state">
+          <i data-lucide="cloud-upload" class="empty-state-icon"></i>
+          <h2 class="empty-state-title">No files yet</h2>
+          <p class="empty-state-text">Drop files here or click Upload</p>
+        </div>
+        <!-- File/folder items are rendered here by JS -->
+      </section>
+
+    </main>
+
+    <!-- ========== RIGHT PREVIEW PANE ========== -->
+    <aside class="preview-panel" id="preview-panel" aria-label="File preview" hidden>
+      <div class="preview-header">
+        <h2 class="preview-filename" id="preview-filename">filename.ext</h2>
+        <button class="icon-btn" id="preview-close-btn" type="button" aria-label="Close preview">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="preview-meta" id="preview-meta">
+        <!-- File metadata rendered by JS -->
+      </div>
+
+      <div class="preview-content" id="preview-content">
+        <!-- Preview rendered by JS (images, PDF, docx, etc.) -->
+      </div>
+
+      <div class="preview-actions">
+        <button class="btn btn-secondary" id="preview-download-btn" type="button">
+          <i data-lucide="download"></i>
+          <span>Download</span>
+        </button>
+        <button class="btn btn-secondary" id="preview-share-btn" type="button">
+          <i data-lucide="share-2"></i>
+          <span>Share</span>
+        </button>
+        <button class="btn btn-secondary" id="preview-edit-btn" type="button">
+          <i data-lucide="pencil"></i>
+          <span>Edit</span>
+        </button>
+        <button class="btn btn-danger" id="preview-delete-btn" type="button">
+          <i data-lucide="trash-2"></i>
+          <span>Delete</span>
+        </button>
+      </div>
+    </aside>
+
+  </div><!-- /.app-layout -->
+
+  <!-- ========== SHARE MODAL ========== -->
+  <div class="modal-overlay" id="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-modal-title" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="share-modal-title">Share File</h2>
+        <button class="icon-btn modal-close" data-modal-close="share-modal" type="button" aria-label="Close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <p class="share-filename" id="share-filename">filename.ext</p>
+
+        <div class="share-link-row">
+          <input type="text" class="share-link-input" id="share-link-input" readonly value="https://opendocs.app/s/abc123">
+          <button class="btn btn-primary" id="copy-link-btn" type="button">
+            <i data-lucide="copy"></i>
+            <span>Copy Link</span>
+          </button>
+        </div>
+
+        <div class="share-permission-row">
+          <label for="share-permission">Anyone with the link can:</label>
+          <select id="share-permission" class="select-input">
+            <option value="view">View</option>
+            <option value="edit">Edit</option>
+          </select>
+        </div>
+
+        <div class="share-people">
+          <h3 class="share-people-title">People with access</h3>
+          <ul class="share-people-list" id="share-people-list">
+            <li class="share-person">
+              <div class="share-person-avatar">DM</div>
+              <div class="share-person-info">
+                <span class="share-person-name">David Mitchell</span>
+                <span class="share-person-role">Owner</span>
+              </div>
+            </li>
+            <li class="share-person">
+              <div class="share-person-avatar">JD</div>
+              <div class="share-person-info">
+                <span class="share-person-name">Jane Doe</span>
+                <span class="share-person-role">Can edit</span>
+              </div>
+            </li>
+            <li class="share-person">
+              <div class="share-person-avatar">AS</div>
+              <div class="share-person-info">
+                <span class="share-person-name">Alex Smith</span>
+                <span class="share-person-role">Can view</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-modal-close="share-modal" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== NEW FOLDER MODAL ========== -->
+  <div class="modal-overlay" id="folder-modal" role="dialog" aria-modal="true" aria-labelledby="folder-modal-title" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="folder-modal-title">New Folder</h2>
+        <button class="icon-btn modal-close" data-modal-close="folder-modal" type="button" aria-label="Close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <label for="folder-name-input" class="input-label">Folder name</label>
+        <input type="text" id="folder-name-input" class="text-input" placeholder="Untitled Folder" autofocus>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-modal-close="folder-modal" type="button">Cancel</button>
+        <button class="btn btn-primary" id="create-folder-btn" type="button">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== EDITOR MODAL (FULL-SCREEN) ========== -->
+  <div class="modal-overlay editor-overlay" id="editor-modal" role="dialog" aria-modal="true" aria-labelledby="editor-modal-title" hidden>
+    <div class="editor-modal">
+      <div class="editor-header">
+        <h2 class="editor-title" id="editor-modal-title">Edit Document</h2>
+        <div class="editor-toolbar" id="editor-toolbar">
+          <button class="icon-btn" id="editor-bold-btn" type="button" aria-label="Bold" title="Bold">
+            <i data-lucide="bold"></i>
+          </button>
+          <button class="icon-btn" id="editor-italic-btn" type="button" aria-label="Italic" title="Italic">
+            <i data-lucide="italic"></i>
+          </button>
+          <button class="icon-btn" id="editor-underline-btn" type="button" aria-label="Underline" title="Underline">
+            <i data-lucide="underline"></i>
+          </button>
+        </div>
+        <div class="editor-actions">
+          <button class="btn btn-primary" id="editor-save-btn" type="button">
+            <i data-lucide="save"></i>
+            <span>Save</span>
+          </button>
+          <button class="btn btn-secondary" id="editor-close-btn" type="button">
+            <i data-lucide="x"></i>
+            <span>Close</span>
+          </button>
+        </div>
+      </div>
+
+      <div
+        class="editor-content"
+        id="editor-content"
+        contenteditable="true"
+        role="textbox"
+        aria-multiline="true"
+        aria-label="Document editor"
+      ></div>
+    </div>
+  </div>
+
+  <!-- ========== TOAST CONTAINER ========== -->
+  <div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="true">
+    <!-- Toasts are appended here by JS -->
+  </div>
+
+  <!-- ========== DRAG OVERLAY ========== -->
+  <div class="drag-overlay" id="drag-overlay" hidden>
+    <div class="drag-overlay-content">
+      <i data-lucide="upload-cloud" class="drag-overlay-icon"></i>
+      <p class="drag-overlay-text">Drop files to upload</p>
+    </div>
+  </div>
+
+  <!-- PDF.js Worker -->
+  <script>
+    if (typeof pdfjsLib !== "undefined") {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
+  </script>
+
+  <!-- App Logic -->
+  <script src="js/app.js"></script>
+</body>
+</html>
