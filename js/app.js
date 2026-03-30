@@ -1960,10 +1960,10 @@
       await fetchFile(base + '05 Protokolle/Baubesprechung_Nr11_2026-03-26.docx', 'Baubesprechung_Nr11_2026-03-26.docx', protokolle);
       await fetchFile(base + '05 Protokolle/Abnahmeprotokoll_Vorlage.docx', 'Abnahmeprotokoll_Vorlage.docx', protokolle);
 
-      await fetchFile(base + '06 Fotos/Baustellenuebersicht_2026-03-10.svg', 'Baustellenübersicht_2026-03-10.svg', fotos);
-      await fetchFile(base + '06 Fotos/Spundwand_Achse1-3_2026-03-25.svg', 'Spundwand_Achse1-3_2026-03-25.svg', fotos);
-      await fetchFile(base + '06 Fotos/Baugrube_von_oben_2026-04-01.svg', 'Baugrube_von_oben_2026-04-01.svg', fotos);
-      await fetchFile(base + '06 Fotos/Baustellenzufahrt_2026-03-05.svg', 'Baustellenzufahrt_2026-03-05.svg', fotos);
+      await fetchFile(base + '06 Fotos/Baustellenuebersicht_2026-03-10.jpg', 'Baustellenübersicht_2026-03-10.jpg', fotos);
+      await fetchFile(base + '06 Fotos/Baugrube_von_oben_2026-04-01.jpg', 'Baugrube_von_oben_2026-04-01.jpg', fotos);
+      await fetchFile(base + '06 Fotos/Baustellenzufahrt_2026-03-05.jpg', 'Baustellenzufahrt_2026-03-05.jpg', fotos);
+      await fetchFile(base + '06 Fotos/Rohbauarbeiten_2026-03-25.jpg', 'Rohbauarbeiten_2026-03-25.jpg', fotos);
 
       await fetchFile(base + '07 Vertraege/Generalplanervertrag_Entwurf.docx', 'Generalplanervertrag_Entwurf.docx', vertraege);
       await fetchFile(base + '07 Vertraege/Buergschaftsuebersicht.xlsx', 'Bürgschaftsübersicht.xlsx', vertraege);
