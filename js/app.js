@@ -2033,6 +2033,25 @@
     if (settingsBtn) settingsBtn.addEventListener('click', function () { Router.go('settings'); });
     if (settingsBackBtn) settingsBackBtn.addEventListener('click', function () { history.back(); });
 
+    // -- API Docs --
+    var apiDocsBtn = $('footer-api-btn');
+    var apiDocsView = $('api-docs-view');
+    var apiDocsBackBtn = $('api-docs-back-btn');
+    if (apiDocsBtn) {
+      apiDocsBtn.addEventListener('click', function () { Router.go('api'); });
+    }
+    if (apiDocsBackBtn) {
+      apiDocsBackBtn.addEventListener('click', function () { history.back(); });
+    }
+
+    // -- Notifications (placeholder) --
+    var notifBtn = $('notification-btn');
+    if (notifBtn) {
+      notifBtn.addEventListener('click', function () {
+        UI.showToast('Notifications will be available in a future update', 'info');
+      });
+    }
+
     // -- Context menu: close on click outside --
     document.addEventListener('click', function () {
       ContextMenu.hide();
@@ -2181,6 +2200,7 @@
       var hash = location.hash.replace(/^#\/?/, '');
       if (!hash) return { type: 'root' };
       if (hash === 'settings') return { type: 'settings' };
+      if (hash === 'api') return { type: 'api' };
       if (hash.indexOf('s/') === 0) return { type: 'share', token: hash.substring(2) };
       if (hash.indexOf('d/') === 0) return { type: 'document', slug: hash.substring(2) };
       if (hash.indexOf('f/') === 0) return { type: 'folder', path: hash.substring(2) };
@@ -2213,16 +2233,20 @@
       var route = this.parse();
 
       switch (route.type) {
-        case 'settings': {
+        case 'settings':
+        case 'api': {
           var mainContent = $('main-content');
           var sidebar = $('sidebar');
+          var footer = $('app-footer');
           var settingsView = $('settings-view');
+          var apiDocsView = $('api-docs-view');
           if (mainContent) mainContent.hidden = true;
           if (sidebar) sidebar.hidden = true;
-          if (settingsView) {
-            settingsView.hidden = false;
-            lucide.createIcons({ nodes: [settingsView] });
-          }
+          if (footer) footer.hidden = true;
+          if (settingsView) settingsView.hidden = (route.type !== 'settings');
+          if (apiDocsView) apiDocsView.hidden = (route.type !== 'api');
+          var activeView = route.type === 'settings' ? settingsView : apiDocsView;
+          if (activeView) lucide.createIcons({ nodes: [activeView] });
           return;
         }
 
@@ -2286,13 +2310,17 @@
             folderId = found;
           }
 
-          // Close settings if open
+          // Restore normal layout
           var mainContent = $('main-content');
           var sidebar = $('sidebar');
+          var footer = $('app-footer');
           var settingsView = $('settings-view');
+          var apiDocsView = $('api-docs-view');
           if (settingsView) settingsView.hidden = true;
+          if (apiDocsView) apiDocsView.hidden = true;
           if (mainContent) mainContent.hidden = false;
           if (sidebar) sidebar.hidden = false;
+          if (footer) footer.hidden = false;
 
           UI.currentFolder = folderId;
           UI.currentSection = 'my-files';
@@ -2303,13 +2331,17 @@
         }
 
         default: {
-          // Close settings if open, show root
+          // Restore normal layout
           var mainContent = $('main-content');
           var sidebar = $('sidebar');
+          var footer = $('app-footer');
           var settingsView = $('settings-view');
+          var apiDocsView = $('api-docs-view');
           if (settingsView) settingsView.hidden = true;
+          if (apiDocsView) apiDocsView.hidden = true;
           if (mainContent) mainContent.hidden = false;
           if (sidebar) sidebar.hidden = false;
+          if (footer) footer.hidden = false;
           return;
         }
       }

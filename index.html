@@ -48,6 +48,10 @@
       <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle theme">
         <i data-lucide="moon"></i>
       </button>
+      <button class="icon-btn notification-btn" id="notification-btn" type="button" aria-label="Notifications">
+        <i data-lucide="bell"></i>
+        <span class="notification-badge">3</span>
+      </button>
       <button class="icon-btn" id="settings-btn" type="button" aria-label="Settings">
         <i data-lucide="settings"></i>
       </button>
@@ -196,7 +200,260 @@
       </div>
     </div>
 
+    <!-- ========== API DOCS VIEW ========== -->
+    <div class="api-docs-view" id="api-docs-view" hidden>
+      <div class="settings-header">
+        <button class="icon-btn" id="api-docs-back-btn" type="button" aria-label="Back to files">
+          <i data-lucide="arrow-left"></i>
+        </button>
+        <h1 class="settings-title">API Documentation</h1>
+        <span class="api-badge">Draft v0.1</span>
+      </div>
+
+      <div class="api-docs-body">
+        <div class="api-intro">
+          <p>This is a <strong>proposed</strong> REST API for OpenDocs. Endpoints are designed to expose the current application capabilities as a backend service. Authentication, pagination, and error schemas are not yet defined.</p>
+          <p class="api-base-url"><span class="api-label">Base URL</span> <code>https://api.opendocs.example/v1</code></p>
+        </div>
+
+        <!-- Documents -->
+        <div class="api-section">
+          <h2 class="api-section-title">Documents</h2>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-get">GET</span>
+              <code class="api-path">/documents</code>
+              <span class="api-summary">List all documents</span>
+            </div>
+            <div class="api-endpoint-detail">
+              <div class="api-params">
+                <span class="api-label">Query</span>
+                <code>folderId</code> <code>search</code> <code>tags</code> <code>status</code> <code>sort</code> <code>limit</code> <code>offset</code>
+              </div>
+              <div class="api-response">
+                <span class="api-label">Response 200</span>
+                <code>{ "documents": [...], "total": 28, "limit": 50, "offset": 0 }</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-get">GET</span>
+              <code class="api-path">/documents/{id}</code>
+              <span class="api-summary">Get document metadata</span>
+            </div>
+            <div class="api-endpoint-detail">
+              <div class="api-response">
+                <span class="api-label">Response 200</span>
+                <code>{ "id", "title", "creator", "status", "revision", "versions", ... }</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-get">GET</span>
+              <code class="api-path">/documents/{id}/content</code>
+              <span class="api-summary">Download file binary</span>
+            </div>
+            <div class="api-endpoint-detail">
+              <div class="api-response">
+                <span class="api-label">Response 200</span>
+                <code>Binary file stream (Content-Type from metadata)</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-post">POST</span>
+              <code class="api-path">/documents</code>
+              <span class="api-summary">Upload a new document</span>
+            </div>
+            <div class="api-endpoint-detail">
+              <div class="api-params">
+                <span class="api-label">Body</span>
+                <code>multipart/form-data: file, folderId, title, description, tags[], discipline, phase</code>
+              </div>
+              <div class="api-response">
+                <span class="api-label">Response 201</span>
+                <code>{ "id": "doc-xxx", "slug": "...", "shareToken": "..." }</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-put">PUT</span>
+              <code class="api-path">/documents/{id}</code>
+              <span class="api-summary">Update document metadata</span>
+            </div>
+          </div>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-post">POST</span>
+              <code class="api-path">/documents/{id}/versions</code>
+              <span class="api-summary">Upload a new version</span>
+            </div>
+            <div class="api-endpoint-detail">
+              <div class="api-params">
+                <span class="api-label">Body</span>
+                <code>multipart/form-data: file, comment</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-delete">DELETE</span>
+              <code class="api-path">/documents/{id}</code>
+              <span class="api-summary">Move document to trash (soft delete)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Folders -->
+        <div class="api-section">
+          <h2 class="api-section-title">Folders</h2>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-get">GET</span>
+              <code class="api-path">/folders</code>
+              <span class="api-summary">List all folders</span>
+            </div>
+            <div class="api-endpoint-detail">
+              <div class="api-params">
+                <span class="api-label">Query</span>
+                <code>parentId</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-post">POST</span>
+              <code class="api-path">/folders</code>
+              <span class="api-summary">Create a folder</span>
+            </div>
+          </div>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-put">PUT</span>
+              <code class="api-path">/folders/{id}</code>
+              <span class="api-summary">Rename or move folder</span>
+            </div>
+          </div>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-delete">DELETE</span>
+              <code class="api-path">/folders/{id}</code>
+              <span class="api-summary">Delete folder and contents</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sharing -->
+        <div class="api-section">
+          <h2 class="api-section-title">Sharing</h2>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-get">GET</span>
+              <code class="api-path">/share/{token}</code>
+              <span class="api-summary">Resolve share link to document</span>
+            </div>
+          </div>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-post">POST</span>
+              <code class="api-path">/documents/{id}/share</code>
+              <span class="api-summary">Create or update share link</span>
+            </div>
+            <div class="api-endpoint-detail">
+              <div class="api-params">
+                <span class="api-label">Body</span>
+                <code>{ "email": "...", "permission": "view|edit" }</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-delete">DELETE</span>
+              <code class="api-path">/documents/{id}/share/{email}</code>
+              <span class="api-summary">Revoke access</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search -->
+        <div class="api-section">
+          <h2 class="api-section-title">Search</h2>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-get">GET</span>
+              <code class="api-path">/search</code>
+              <span class="api-summary">Full-text search across documents and metadata</span>
+            </div>
+            <div class="api-endpoint-detail">
+              <div class="api-params">
+                <span class="api-label">Query</span>
+                <code>q</code> <code>folderId</code> <code>type</code> <code>tags</code> <code>discipline</code> <code>status</code> <code>limit</code>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metadata -->
+        <div class="api-section">
+          <h2 class="api-section-title">Metadata & Project</h2>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-get">GET</span>
+              <code class="api-path">/project</code>
+              <span class="api-summary">Get project metadata</span>
+            </div>
+          </div>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-get">GET</span>
+              <code class="api-path">/tags</code>
+              <span class="api-summary">List all tags with document counts</span>
+            </div>
+          </div>
+
+          <div class="api-endpoint">
+            <div class="api-endpoint-header">
+              <span class="api-method api-get">GET</span>
+              <code class="api-path">/disciplines</code>
+              <span class="api-summary">List disciplines (Architektur, Bauleitung, ...)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Preview panel removed — replaced by viewer modal -->
+
+    <!-- ========== FOOTER ========== -->
+    <footer class="app-footer" id="app-footer">
+      <span class="footer-version">OpenDocs v0.1.0</span>
+      <nav class="footer-links">
+        <button class="footer-link" id="footer-api-btn" type="button">API Docs</button>
+        <span class="footer-sep">&middot;</span>
+        <a class="footer-link" href="https://github.com/davras5/open-docs" target="_blank" rel="noopener">Source Code</a>
+      </nav>
+    </footer>
 
   </div><!-- /.app-layout -->
 
