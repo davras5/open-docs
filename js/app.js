@@ -490,6 +490,14 @@
           self.isSearching = false;
           self.renderBreadcrumb();
           self.renderFileList();
+          // Update URL — find metadata folder for this name
+          if (Metadata.data) {
+            var metaFolder = Metadata.data.folders.find(function(f) { return f.name === file.name; });
+            if (metaFolder) {
+              var path = Metadata.getFolderPath(metaFolder.id);
+              if (path) history.replaceState(null, '', '#/f/' + path);
+            }
+          }
         } else {
           self.selectFile(file.id);
           Viewer.open(file);
@@ -837,7 +845,15 @@
         if (nameEl) nameEl.textContent = meta.name;
 
         var linkInput = $('share-link-input');
-        if (linkInput) linkInput.value = location.origin + location.pathname + '#shared/' + fileId;
+        if (linkInput) {
+          var metaId = meta._metaId;
+          var docMeta = metaId && Metadata.data ? Metadata.getDocById(metaId) : null;
+          if (docMeta && docMeta.shareToken) {
+            linkInput.value = Router.shareUrl(docMeta.shareToken);
+          } else {
+            linkInput.value = location.origin + location.pathname + '#/s/' + fileId;
+          }
+        }
 
         // Render shared people
         var list = $('share-people-list');
@@ -873,7 +889,16 @@
 
     /** Copy share link to clipboard. */
     async copyShareLink(fileId) {
-      var url = location.origin + location.pathname + '#shared/' + fileId;
+      // Try to find share token from metadata
+      var url;
+      var fileMeta = await Storage.getFile(fileId);
+      var metaId = fileMeta && fileMeta._metaId;
+      var docMeta = metaId && Metadata.data ? Metadata.getDocById(metaId) : null;
+      if (docMeta && docMeta.shareToken) {
+        url = Router.shareUrl(docMeta.shareToken);
+      } else {
+        url = location.origin + location.pathname + '#/s/' + fileId;
+      }
       try {
         await navigator.clipboard.writeText(url);
         UI.showToast('Link copied to clipboard', 'success');
@@ -993,7 +1018,15 @@
       // Set header info
       if (filename) filename.textContent = file.name;
       if (metaBrief) {
-        metaBrief.textContent = formatSize(file.size) + ' · ' + formatDate(file.modifiedAt);
+        var parts = [formatSize(file.size)];
+        if (file._docMeta) {
+          if (file._docMeta.revision) parts.push('Rev. ' + file._docMeta.revision);
+          if (file._docMeta.status) parts.push(file._docMeta.status);
+          if (file._docMeta.creator) parts.push(file._docMeta.creator);
+        } else {
+          parts.push(formatDate(file.modifiedAt));
+        }
+        metaBrief.textContent = parts.join(' · ');
       }
 
       // Show/hide action buttons based on file type
@@ -1020,6 +1053,15 @@
 
       // Store file ID on modal
       modal.dataset.fileId = file.id;
+
+      // Attach document metadata if available
+      if (!file._docMeta && file._metaId && Metadata.data) {
+        file._docMeta = Metadata.getDocById(file._metaId);
+      }
+      // Update URL to document slug
+      if (file._docMeta && file._docMeta.slug) {
+        history.replaceState(null, '', '#/d/' + file._docMeta.slug);
+      }
 
       try {
         var data = await Storage.getData(file.id);
@@ -1055,10 +1097,16 @@
       var modal = $('viewer-modal');
       if (modal) modal.hidden = true;
       this.currentFile = null;
+      // Clear document URL, restore folder URL
+      if (location.hash.indexOf('#/d/') === 0 || location.hash.indexOf('#/s/') === 0) {
+        history.replaceState(null, '', location.pathname + (UI.currentFolder ? location.hash.replace(/#\/[ds]\/.*/, '') : ''));
+      }
       this.siblingFiles = [];
       this.currentIndex = -1;
       this._destroyZoom();
       if (typeof DwgViewer !== 'undefined') DwgViewer.cleanup();
+      var infoPanel = $('viewer-info-panel');
+      if (infoPanel) infoPanel.hidden = true;
     },
 
     async prev() {
@@ -1751,6 +1799,102 @@
     if (zoomOutBtn) zoomOutBtn.addEventListener('click', function () { if (Viewer._zoom) Viewer._zoom.zoomOut(); });
     if (zoomFitBtn) zoomFitBtn.addEventListener('click', function () { if (Viewer._zoom) Viewer._zoom.zoomFit(); });
 
+    // -- Document info panel --
+    var infoBtn = $('viewer-info-btn');
+    var infoPanel = $('viewer-info-panel');
+    var infoClose = $('viewer-info-close');
+    if (infoBtn) {
+      infoBtn.addEventListener('click', function () {
+        if (!infoPanel) return;
+        if (!infoPanel.hidden) { infoPanel.hidden = true; return; }
+        // Populate info from metadata
+        var body = $('viewer-info-body');
+        if (!body || !Viewer.currentFile) return;
+        var dm = Viewer.currentFile._docMeta;
+        var html = '';
+
+        if (dm) {
+          // Document info
+          html += '<div class="info-section"><div class="info-section-title">Document</div>';
+          html += '<div class="info-row"><span class="info-label">Title</span><span class="info-value">' + UI._esc(dm.title) + '</span></div>';
+          if (dm.description) html += '<div class="info-row"><span class="info-label">Description</span><span class="info-value">' + UI._esc(dm.description) + '</span></div>';
+          if (dm.type) html += '<div class="info-row"><span class="info-label">Type</span><span class="info-value">' + UI._esc(dm.type) + '</span></div>';
+          if (dm.status) {
+            var sc = dm.status.toLowerCase().replace(/[^a-z]/g,'');
+            var cls = 'status-default';
+            if (sc.indexOf('freigeg') > -1 || sc.indexOf('rechts') > -1 || sc.indexOf('unterzeichn') > -1 || sc.indexOf('abgeschl') > -1) cls = 'status-freigegeben';
+            else if (sc.indexOf('laufend') > -1 || sc.indexOf('bearbeit') > -1) cls = 'status-laufend';
+            else if (sc.indexOf('pruf') > -1 || sc.indexOf('pruef') > -1) cls = 'status-pruefung';
+            html += '<div class="info-row"><span class="info-label">Status</span><span class="info-value"><span class="info-status ' + cls + '">' + UI._esc(dm.status) + '</span></span></div>';
+          }
+          if (dm.revision) html += '<div class="info-row"><span class="info-label">Revision</span><span class="info-value">' + UI._esc(dm.revision) + '</span></div>';
+          if (dm.rights) html += '<div class="info-row"><span class="info-label">Classification</span><span class="info-value">' + UI._esc(dm.rights) + '</span></div>';
+          html += '</div>';
+
+          // Construction fields
+          html += '<div class="info-section"><div class="info-section-title">Project</div>';
+          if (dm.discipline) html += '<div class="info-row"><span class="info-label">Discipline</span><span class="info-value">' + UI._esc(dm.discipline) + '</span></div>';
+          if (dm.phase) html += '<div class="info-row"><span class="info-label">SIA Phase</span><span class="info-value">' + UI._esc(dm.phase) + '</span></div>';
+          if (dm.scale) html += '<div class="info-row"><span class="info-label">Scale</span><span class="info-value">' + UI._esc(dm.scale) + '</span></div>';
+          if (dm.level) html += '<div class="info-row"><span class="info-label">Level</span><span class="info-value">' + UI._esc(dm.level) + '</span></div>';
+          html += '</div>';
+
+          // People
+          html += '<div class="info-section"><div class="info-section-title">People</div>';
+          if (dm.creator) html += '<div class="info-row"><span class="info-label">Author</span><span class="info-value">' + UI._esc(dm.creator) + '</span></div>';
+          if (dm.createdBy) html += '<div class="info-row"><span class="info-label">Created by</span><span class="info-value">' + UI._esc(dm.createdBy) + '</span></div>';
+          if (dm.modifiedBy && dm.modifiedBy !== dm.createdBy) html += '<div class="info-row"><span class="info-label">Modified by</span><span class="info-value">' + UI._esc(dm.modifiedBy) + '</span></div>';
+          html += '</div>';
+
+          // Dates
+          html += '<div class="info-section"><div class="info-section-title">Dates</div>';
+          if (dm.createdAt) html += '<div class="info-row"><span class="info-label">Created</span><span class="info-value">' + new Date(dm.createdAt).toLocaleDateString('de-CH') + '</span></div>';
+          if (dm.modifiedAt) html += '<div class="info-row"><span class="info-label">Modified</span><span class="info-value">' + new Date(dm.modifiedAt).toLocaleDateString('de-CH') + '</span></div>';
+          html += '<div class="info-row"><span class="info-label">Size</span><span class="info-value">' + formatSize(dm.size || Viewer.currentFile.size) + '</span></div>';
+          html += '</div>';
+
+          // Tags
+          if (dm.tags && dm.tags.length > 0) {
+            html += '<div class="info-section"><div class="info-section-title">Tags</div><div>';
+            for (var ti = 0; ti < dm.tags.length; ti++) {
+              html += '<span class="info-tag">' + UI._esc(dm.tags[ti]) + '</span>';
+            }
+            html += '</div></div>';
+          }
+
+          // Version history
+          if (dm.versions && dm.versions.length > 0) {
+            html += '<div class="info-section"><div class="info-section-title">Version History</div>';
+            for (var vi = dm.versions.length - 1; vi >= 0; vi--) {
+              var v = dm.versions[vi];
+              html += '<div class="info-version-item">';
+              html += '<span class="info-version-num">v' + v.version + '</span>';
+              html += '<span class="info-version-date">' + new Date(v.date).toLocaleDateString('de-CH') + '</span>';
+              if (v.comment) html += '<span class="info-version-comment">' + UI._esc(v.comment) + '</span>';
+              if (v.author) html += '<span class="info-version-author">' + UI._esc(v.author) + '</span>';
+              html += '</div>';
+            }
+            html += '</div>';
+          }
+        } else {
+          // No metadata — show basic file info
+          var f = Viewer.currentFile;
+          html += '<div class="info-section"><div class="info-section-title">File</div>';
+          html += '<div class="info-row"><span class="info-label">Name</span><span class="info-value">' + UI._esc(f.name) + '</span></div>';
+          html += '<div class="info-row"><span class="info-label">Size</span><span class="info-value">' + formatSize(f.size) + '</span></div>';
+          html += '<div class="info-row"><span class="info-label">Type</span><span class="info-value">' + UI._esc(f.mimeType || 'Unknown') + '</span></div>';
+          html += '<div class="info-row"><span class="info-label">Modified</span><span class="info-value">' + formatDate(f.modifiedAt) + '</span></div>';
+          html += '</div>';
+        }
+
+        body.innerHTML = html;
+        infoPanel.hidden = false;
+      });
+    }
+    if (infoClose) {
+      infoClose.addEventListener('click', function () { if (infoPanel) infoPanel.hidden = true; });
+    }
+
     // -- Share modal: copy link --
     var copyLinkBtn = $('copy-link-btn');
     if (copyLinkBtn) {
@@ -1828,8 +1972,8 @@
       if (sidebar) sidebar.hidden = false;
     }
 
-    if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
-    if (settingsBackBtn) settingsBackBtn.addEventListener('click', closeSettings);
+    if (settingsBtn) settingsBtn.addEventListener('click', function () { Router.go('settings'); });
+    if (settingsBackBtn) settingsBackBtn.addEventListener('click', function () { history.back(); });
 
     // -- Context menu: close on click outside --
     document.addEventListener('click', function () {
@@ -1892,10 +2036,6 @@
     DragDrop.init();
     Search.init();
 
-    // -- Check for share link in URL hash --
-    handleShareHash();
-    window.addEventListener('hashchange', handleShareHash);
-
     // -- Initialize lucide icons --
     lucide.createIcons();
 
@@ -1908,26 +2048,214 @@
     UI.updateStorageBar();
   }
 
-  /**
-   * Handle #shared/FILE_ID hash URLs.
-   * Opens the preview for a shared file when the app loads with such a hash.
-   */
-  async function handleShareHash() {
-    var hash = location.hash;
-    if (hash.indexOf('#shared/') === 0) {
-      var fileId = hash.replace('#shared/', '');
+  // ---------------------------------------------------------------------------
+  // Metadata & URL Routing
+  // ---------------------------------------------------------------------------
+
+  var Metadata = {
+    data: null,
+
+    async load() {
+      if (this.data) return this.data;
       try {
-        var meta = await Storage.getFile(fileId);
-        if (meta) {
-          Viewer.open(meta);
-        } else {
-          UI.showToast('Shared file not found', 'error');
-        }
+        var resp = await fetch('data/metadata.json');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        this.data = await resp.json();
+        return this.data;
       } catch (err) {
-        UI.showToast('Failed to load shared file', 'error');
+        console.warn('Failed to load metadata.json:', err);
+        return null;
+      }
+    },
+
+    getDocById(id) {
+      if (!this.data) return null;
+      return this.data.documents.find(function(d) { return d.id === id; }) || null;
+    },
+
+    getDocBySlug(slug) {
+      if (!this.data) return null;
+      return this.data.documents.find(function(d) { return d.slug === slug; }) || null;
+    },
+
+    getDocByShareToken(token) {
+      if (!this.data) return null;
+      return this.data.documents.find(function(d) { return d.shareToken === token; }) || null;
+    },
+
+    getFolderBySlug(slug) {
+      if (!this.data) return null;
+      return this.data.folders.find(function(f) { return f.slug === slug; }) || null;
+    },
+
+    getFolderById(id) {
+      if (!this.data) return null;
+      return this.data.folders.find(function(f) { return f.id === id; }) || null;
+    },
+
+    /** Get the folder slug path for a folder ID (e.g. "ueberbauung-seefeld/01-planung") */
+    getFolderPath(folderId) {
+      if (!this.data) return '';
+      var parts = [];
+      var id = folderId;
+      while (id) {
+        var f = this.getFolderById(id);
+        if (!f) break;
+        parts.unshift(f.slug);
+        id = f.parentId;
+      }
+      return parts.join('/');
+    },
+
+    /** Find the IndexedDB file ID for a given metadata doc ID */
+    async findFileStoreId(metaDocId) {
+      var found = null;
+      await fileStore.iterate(function(value) {
+        if (value._metaId === metaDocId) { found = value.id; return; }
+      });
+      return found;
+    }
+  };
+
+  var Router = {
+    /** Parse current hash into a route object */
+    parse() {
+      var hash = location.hash.replace(/^#\/?/, '');
+      if (!hash) return { type: 'root' };
+      if (hash === 'settings') return { type: 'settings' };
+      if (hash.indexOf('s/') === 0) return { type: 'share', token: hash.substring(2) };
+      if (hash.indexOf('d/') === 0) return { type: 'document', slug: hash.substring(2) };
+      if (hash.indexOf('f/') === 0) return { type: 'folder', path: hash.substring(2) };
+      return { type: 'root' };
+    },
+
+    /** Navigate to a route by updating the hash */
+    go(hash) {
+      location.hash = '#/' + hash;
+    },
+
+    /** Build a folder URL path */
+    folderUrl(folderId) {
+      var path = Metadata.getFolderPath(folderId);
+      return path ? 'f/' + path : '';
+    },
+
+    /** Build a document URL */
+    docUrl(slug) {
+      return 'd/' + slug;
+    },
+
+    /** Build a share URL */
+    shareUrl(token) {
+      return location.origin + location.pathname + '#/s/' + token;
+    },
+
+    /** Handle route changes */
+    async handleRoute() {
+      var route = this.parse();
+
+      switch (route.type) {
+        case 'settings': {
+          var mainContent = $('main-content');
+          var sidebar = $('sidebar');
+          var settingsView = $('settings-view');
+          if (mainContent) mainContent.hidden = true;
+          if (sidebar) sidebar.hidden = true;
+          if (settingsView) {
+            settingsView.hidden = false;
+            lucide.createIcons({ nodes: [settingsView] });
+          }
+          return;
+        }
+
+        case 'share': {
+          await Metadata.load();
+          var docMeta = Metadata.getDocByShareToken(route.token);
+          if (docMeta) {
+            var fileId = await Metadata.findFileStoreId(docMeta.id);
+            if (fileId) {
+              var fileMeta = await Storage.getFile(fileId);
+              if (fileMeta) {
+                fileMeta._docMeta = docMeta;
+                Viewer.open(fileMeta);
+                return;
+              }
+            }
+          }
+          UI.showToast('Shared document not found', 'error');
+          return;
+        }
+
+        case 'document': {
+          await Metadata.load();
+          var docMeta = Metadata.getDocBySlug(route.slug);
+          if (docMeta) {
+            var fileId = await Metadata.findFileStoreId(docMeta.id);
+            if (fileId) {
+              var fileMeta = await Storage.getFile(fileId);
+              if (fileMeta) {
+                fileMeta._docMeta = docMeta;
+                Viewer.open(fileMeta);
+                return;
+              }
+            }
+          }
+          UI.showToast('Document not found', 'error');
+          return;
+        }
+
+        case 'folder': {
+          await Metadata.load();
+          // Parse the path segments and navigate into the deepest folder
+          var segments = route.path.split('/').filter(Boolean);
+          var folderId = null;
+          for (var i = 0; i < segments.length; i++) {
+            var folder = Metadata.data.folders.find(function(f) {
+              return f.slug === segments[i] && f.parentId === folderId;
+            });
+            if (!folder) {
+              // Try finding the folder by slug in IndexedDB
+              break;
+            }
+            // Find the IndexedDB folder with matching name
+            var found = null;
+            await fileStore.iterate(function(value) {
+              if (value.type === 'folder' && value.name === folder.name && value.parentId === (folderId || null)) {
+                found = value.id;
+              }
+            });
+            folderId = found;
+          }
+
+          // Close settings if open
+          var mainContent = $('main-content');
+          var sidebar = $('sidebar');
+          var settingsView = $('settings-view');
+          if (settingsView) settingsView.hidden = true;
+          if (mainContent) mainContent.hidden = false;
+          if (sidebar) sidebar.hidden = false;
+
+          UI.currentFolder = folderId;
+          UI.currentSection = 'my-files';
+          UI.isSearching = false;
+          UI.renderBreadcrumb();
+          UI.renderFileList();
+          return;
+        }
+
+        default: {
+          // Close settings if open, show root
+          var mainContent = $('main-content');
+          var sidebar = $('sidebar');
+          var settingsView = $('settings-view');
+          if (settingsView) settingsView.hidden = true;
+          if (mainContent) mainContent.hidden = false;
+          if (sidebar) sidebar.hidden = false;
+          return;
+        }
       }
     }
-  }
+  };
 
   // ---------------------------------------------------------------------------
   // Demo Seed Data — German Construction Project
@@ -1937,8 +2265,14 @@
     if (localStorage.getItem('opendocs-seeded')) return;
     localStorage.setItem('opendocs-seeded', '1');
 
+    var meta = await Metadata.load();
+    if (!meta) {
+      console.warn('No metadata.json — skipping seed');
+      return;
+    }
+
     // Helper: create a folder and return its ID
-    async function folder(name, parentId) {
+    async function createFolder(name, parentId) {
       var id = crypto.randomUUID();
       await Storage.saveFile({
         id: id, name: name, type: 'folder', mimeType: null, size: 0,
@@ -1947,113 +2281,52 @@
       return id;
     }
 
-    // Helper: fetch a file from the repo and store it
-    async function fetchFile(urlPath, name, parentId, opts) {
-      opts = opts || {};
-      try {
-        var resp = await fetch(urlPath);
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        var buffer = await resp.arrayBuffer();
-        var mimeTypes = {
-          docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          pdf: 'application/pdf',
-          svg: 'image/svg+xml',
-          jpg: 'image/jpeg',
-          jpeg: 'image/jpeg',
-          png: 'image/png',
-          dwg: 'application/acad',
-          dxf: 'application/dxf',
-          md: 'text/markdown',
-          csv: 'text/csv',
-          txt: 'text/plain'
-        };
-        var ext = (name.split('.').pop() || '').toLowerCase();
-        await Storage.saveFile({
-          id: crypto.randomUUID(), name: name, type: 'file',
-          mimeType: mimeTypes[ext] || 'application/octet-stream',
-          size: buffer.byteLength, parentId: parentId || null,
-          shared: opts.shared || false,
-          sharedWith: opts.sharedWith || [],
-          starred: false, deleted: false
-        }, buffer);
-      } catch (err) {
-        console.warn('Failed to fetch demo file: ' + urlPath, err);
-      }
-    }
-
     try {
       var base = 'demo-files/';
 
-      // Root project folder — Swiss construction project
-      var projekt = await folder('Überbauung Seefeld Zürich');
+      // Create folders from metadata (map metadata folder ID → IndexedDB ID)
+      var folderIdMap = {};
+      for (var i = 0; i < meta.folders.length; i++) {
+        var f = meta.folders[i];
+        var parentDbId = f.parentId ? folderIdMap[f.parentId] : null;
+        folderIdMap[f.id] = await createFolder(f.name, parentDbId || null);
+      }
 
-      // Subfolders
-      var planung     = await folder('01 Planung', projekt);
-      var bewillig    = await folder('02 Bewilligungen', projekt);
-      var ausfuehrung = await folder('03 Bauausführung', projekt);
-      var kosten      = await folder('04 Kosten', projekt);
-      var protokolle  = await folder('05 Protokolle', projekt);
-      var fotos       = await folder('06 Fotos', projekt);
-      var vertraege   = await folder('07 Verträge', projekt);
-      var sibe        = await folder('08 SIBE', projekt);
+      // Create files from metadata
+      var mimeTypes = {
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        pdf: 'application/pdf', svg: 'image/svg+xml', md: 'text/markdown',
+        csv: 'text/csv', txt: 'text/plain', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+        png: 'image/png', dwg: 'application/acad', dxf: 'application/dxf'
+      };
 
-      // 01 Planung
-      await fetchFile(base + '01 Planung/Projektbeschrieb.docx', 'Projektbeschrieb.docx', planung);
-      await fetchFile(base + '01 Planung/Raumprogramm.xlsx', 'Raumprogramm.xlsx', planung);
-      await fetchFile(base + '01 Planung/Terminplan.xlsx', 'Terminplan.xlsx', planung);
-      await fetchFile(base + '01 Planung/Gestaltungskonzept.docx', 'Gestaltungskonzept.docx', planung);
-      await fetchFile(base + '01 Planung/Grundriss_EG.dwg', 'Grundriss_EG.dwg', planung);
-      await fetchFile(base + '01 Planung/Fassade_Detail.dwg', 'Fassade_Detail.dwg', planung);
+      for (var i = 0; i < meta.documents.length; i++) {
+        var doc = meta.documents[i];
+        try {
+          var resp = await fetch(base + doc.filePath);
+          if (!resp.ok) continue;
+          var buffer = await resp.arrayBuffer();
+          var ext = (doc.fileName.split('.').pop() || '').toLowerCase();
+          await Storage.saveFile({
+            id: crypto.randomUUID(),
+            name: doc.fileName,
+            type: 'file',
+            mimeType: doc.format || mimeTypes[ext] || 'application/octet-stream',
+            size: buffer.byteLength,
+            parentId: folderIdMap[doc.folderId] || null,
+            shared: doc.shared || false,
+            sharedWith: doc.sharedWith || [],
+            starred: false,
+            deleted: false,
+            _metaId: doc.id  // Link back to metadata
+          }, buffer);
+        } catch (err) {
+          console.warn('Failed to fetch: ' + doc.filePath, err);
+        }
+      }
 
-      // 02 Bewilligungen
-      await fetchFile(base + '02 Bewilligungen/Baubewilligung.pdf', 'Baubewilligung.pdf', bewillig);
-      await fetchFile(base + '02 Bewilligungen/Brandschutzkonzept.docx', 'Brandschutzkonzept.docx', bewillig);
-      await fetchFile(base + '02 Bewilligungen/UVB_Kurzfassung.docx', 'UVB_Kurzfassung.docx', bewillig);
-
-      // 03 Bauausführung
-      await fetchFile(base + '03 Bauausführung/Baustellenordnung.pdf', 'Baustellenordnung.pdf', ausfuehrung);
-      await fetchFile(base + '03 Bauausführung/Unternehmerverzeichnis.xlsx', 'Unternehmerverzeichnis.xlsx', ausfuehrung);
-      await fetchFile(base + '03 Bauausführung/Bautagesbericht_2026-04-15.docx', 'Bautagesbericht_2026-04-15.docx', ausfuehrung);
-      await fetchFile(base + '03 Bauausführung/Mängelliste.xlsx', 'Mängelliste.xlsx', ausfuehrung);
-
-      // 04 Kosten
-      await fetchFile(base + '04 Kosten/Kostenvoranschlag_BKP.xlsx', 'Kostenvoranschlag_BKP.xlsx', kosten);
-      await fetchFile(base + '04 Kosten/Zahlungsplan_2026.xlsx', 'Zahlungsplan_2026.xlsx', kosten);
-      await fetchFile(base + '04 Kosten/Nachtragsverzeichnis.docx', 'Nachtragsverzeichnis.docx', kosten);
-
-      // 05 Protokolle
-      await fetchFile(base + '05 Protokolle/Bausitzung_Nr14_2026-04-16.docx', 'Bausitzung_Nr14_2026-04-16.docx', protokolle,
-        { shared: true, sharedWith: [
-          { name: 'Marco Keller', email: 'm.keller@implenia.com', permission: 'edit' },
-          { name: 'Stefan Meier', email: 's.meier@seefeld-immo.ch', permission: 'view' }
-        ]});
-      await fetchFile(base + '05 Protokolle/Baufortschrittsbericht_Apr_2026.pdf', 'Baufortschrittsbericht_Apr_2026.pdf', protokolle);
-
-      // 06 Fotos
-      await fetchFile(base + '06 Fotos/Baugrube_2026-04-01.jpg', 'Baugrube_2026-04-01.jpg', fotos);
-      await fetchFile(base + '06 Fotos/Bohrpfahlarbeiten_2026-03-25.jpg', 'Bohrpfahlarbeiten_2026-03-25.jpg', fotos);
-      await fetchFile(base + '06 Fotos/Baustellenzufahrt_2026-02-15.jpg', 'Baustellenzufahrt_2026-02-15.jpg', fotos);
-      await fetchFile(base + '06 Fotos/Verbauarbeiten_2026-04-10.jpg', 'Verbauarbeiten_2026-04-10.jpg', fotos);
-
-      // 07 Verträge
-      await fetchFile(base + '07 Verträge/Generalplanervertrag.docx', 'Generalplanervertrag.docx', vertraege);
-      await fetchFile(base + '07 Verträge/Bürgschaftsübersicht.xlsx', 'Bürgschaftsübersicht.xlsx', vertraege);
-
-      // 08 SIBE
-      await fetchFile(base + '08 SIBE/Sicherheitskonzept.docx', 'Sicherheitskonzept.docx', sibe);
-      await fetchFile(base + '08 SIBE/Unterweisungsnachweis_2026.xlsx', 'Unterweisungsnachweis_2026.xlsx', sibe);
-
-      // Root-level files
-      await fetchFile(base + 'Projektübersicht.md', 'Projektübersicht.md', projekt,
-        { shared: true, sharedWith: [
-          { name: 'Laura Brunner', email: 'brunner@be-arch.ch', permission: 'edit' },
-          { name: 'Marco Keller', email: 'm.keller@implenia.com', permission: 'edit' },
-          { name: 'Nina Frei', email: 'n.frei@sibe-zuerich.ch', permission: 'view' }
-        ]});
-      await fetchFile(base + 'Kontaktliste.xlsx', 'Kontaktliste.xlsx', projekt);
-
-      UI.showToast('Demo-Projekt geladen: Überbauung Seefeld Zürich', 'success');
+      UI.showToast('Demo-Projekt geladen: ' + meta.project.name, 'success');
     } catch (err) {
       console.error('Seed failed:', err);
       UI.showToast('Demo-Daten konnten nicht geladen werden', 'error');
@@ -2063,12 +2336,22 @@
   // -- Boot the application --
   document.addEventListener('DOMContentLoaded', async function () {
     init();
+    await Metadata.load();
     await seedDemoData();
-    // Re-render after seeding
-    if (localStorage.getItem('opendocs-seeded')) {
-      UI.renderFileList();
-      UI.updateStorageBar();
+
+    // Handle initial route or render default
+    var route = Router.parse();
+    if (route.type !== 'root') {
+      await Router.handleRoute();
     }
+
+    UI.renderFileList();
+    UI.updateStorageBar();
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', function () {
+      Router.handleRoute();
+    });
   });
 
 })();

@@ -229,10 +229,26 @@
         <button class="viewer-action-btn" id="viewer-delete-btn" type="button" title="Delete">
           <i data-lucide="trash-2"></i>
         </button>
+        <button class="viewer-action-btn" id="viewer-info-btn" type="button" title="Document info">
+          <i data-lucide="info"></i>
+        </button>
       </div>
       <button class="viewer-close-btn" id="viewer-back-btn" type="button" aria-label="Close">
         <i data-lucide="x"></i>
       </button>
+    </div>
+
+    <!-- Metadata info panel (slides in from right) -->
+    <div class="viewer-info-panel" id="viewer-info-panel" hidden>
+      <div class="viewer-info-header">
+        <h3>Document Info</h3>
+        <button class="icon-btn" id="viewer-info-close" type="button" aria-label="Close info">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="viewer-info-body" id="viewer-info-body">
+        <!-- Populated by JS -->
+      </div>
     </div>
 
     <!-- Navigation arrows -->
