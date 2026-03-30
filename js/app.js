@@ -315,6 +315,8 @@
       existing.forEach(function (el) { el.remove(); });
 
       if (files.length === 0) {
+        var countEl = $('file-count');
+        if (countEl) countEl.hidden = true;
         if (emptyState) {
           emptyState.hidden = false;
           // Customize empty state text per section
@@ -368,6 +370,18 @@
 
       // Re-initialize lucide icons for newly created elements
       lucide.createIcons();
+
+      // Update file count
+      var countEl = $('file-count');
+      if (countEl) {
+        var folderCount = files.filter(function(f) { return f.type === 'folder'; }).length;
+        var fileCount = files.filter(function(f) { return f.type !== 'folder'; }).length;
+        var parts = [];
+        if (folderCount > 0) parts.push(folderCount + (folderCount === 1 ? ' folder' : ' folders'));
+        if (fileCount > 0) parts.push(fileCount + (fileCount === 1 ? ' file' : ' files'));
+        countEl.textContent = parts.join(', ') || '';
+        countEl.hidden = false;
+      }
 
       // Show/hide empty trash button
       var emptyTrashBtn = $('empty-trash-btn');
@@ -612,12 +626,6 @@
       this.renderFileList();
     },
 
-    /** Hide the preview panel. */
-    hidePreview() {
-      var panel = $('preview-panel');
-      if (panel) panel.hidden = true;
-    },
-
     // -- internal helpers --
     _esc(str) {
       var el = document.createElement('span');
@@ -736,7 +744,6 @@
         var meta = await Storage.getFile(fileId);
         await Storage.deleteFile(fileId);
         UI.showToast((meta ? meta.name : 'File') + ' moved to trash', 'info');
-        UI.hidePreview();
         UI.selectedFile = null;
         UI.renderFileList();
         UI.updateStorageBar();
@@ -752,7 +759,6 @@
         var meta = await Storage.getFile(fileId);
         await Storage.permanentDelete(fileId);
         UI.showToast((meta ? meta.name : 'File') + ' permanently deleted', 'success');
-        UI.hidePreview();
         UI.selectedFile = null;
         UI.renderFileList();
         UI.updateStorageBar();
@@ -850,163 +856,6 @@
       } catch (err) {
         console.error('Empty trash failed:', err);
         UI.showToast('Failed to empty trash', 'error');
-      }
-    }
-  };
-
-  // ---------------------------------------------------------------------------
-  // Preview Engine
-  // ---------------------------------------------------------------------------
-
-  var Preview = {
-    /** Show preview for a file in the right panel. */
-    async show(file) {
-      var panel = $('preview-panel');
-      var content = $('preview-content');
-      var filename = $('preview-filename');
-      var metaEl = $('preview-meta');
-      if (!panel || !content) return;
-
-      // Set filename
-      if (filename) filename.textContent = file.name;
-
-      // Set metadata
-      if (metaEl) {
-        metaEl.innerHTML =
-          '<div class="preview-meta-item"><strong>Size:</strong> ' + formatSize(file.size) + '</div>' +
-          '<div class="preview-meta-item"><strong>Modified:</strong> ' + formatDate(file.modifiedAt) + '</div>' +
-          '<div class="preview-meta-item"><strong>Type:</strong> ' + (file.mimeType || 'Unknown') + '</div>';
-      }
-
-      // Show panel
-      panel.hidden = false;
-
-      // Show/hide edit button (only for docx)
-      var editBtn = $('preview-edit-btn');
-      if (editBtn) {
-        var ext = (file.name.split('.').pop() || '').toLowerCase();
-        editBtn.style.display = (ext === 'docx' || ext === 'doc') ? '' : 'none';
-      }
-
-      // Clear previous content
-      content.innerHTML = '<div class="preview-loading"><i data-lucide="loader-2" class="spin"></i> Loading preview...</div>';
-      lucide.createIcons({ nodes: [content] });
-
-      // Store file ID on panel for action buttons
-      panel.dataset.fileId = file.id;
-
-      try {
-        var data = await Storage.getData(file.id);
-        var ft = getFileType(file.name);
-
-        if (ft.category === 'document') {
-          await this.renderDocx(data, content);
-        } else if (ft.category === 'spreadsheet') {
-          await this.renderXlsx(data, content);
-        } else if (ft.category === 'pdf') {
-          await this.renderPdf(data, content);
-        } else if (ft.category === 'image') {
-          this.renderImage(data, file.mimeType, content);
-        } else if (ft.category === 'text') {
-          this.renderText(data, content);
-        } else {
-          this.renderUnsupported(file, content);
-        }
-      } catch (err) {
-        console.error('Preview failed:', err);
-        content.innerHTML = '<div class="preview-error">Preview failed to load.</div>';
-      }
-    },
-
-    /** Render a DOCX file using Mammoth. */
-    async renderDocx(arrayBuffer, container) {
-      if (typeof mammoth === 'undefined') {
-        container.innerHTML = '<div class="preview-error">Mammoth library not loaded.</div>';
-        return;
-      }
-      var result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
-      container.innerHTML = '<div class="preview-docx">' + result.value + '</div>';
-    },
-
-    /** Render an XLSX file using SheetJS. */
-    async renderXlsx(arrayBuffer, container) {
-      if (typeof XLSX === 'undefined') {
-        container.innerHTML = '<div class="preview-error">XLSX library not loaded.</div>';
-        return;
-      }
-      var workbook = XLSX.read(arrayBuffer, { type: 'array' });
-      var firstSheet = workbook.SheetNames[0];
-      if (!firstSheet) {
-        container.innerHTML = '<div class="preview-error">No sheets found.</div>';
-        return;
-      }
-      var html = XLSX.utils.sheet_to_html(workbook.Sheets[firstSheet]);
-      container.innerHTML = '<div class="preview-xlsx">' + html + '</div>';
-    },
-
-    /** Render a PDF using pdf.js — all pages, scrollable. */
-    async renderPdf(arrayBuffer, container) {
-      if (typeof pdfjsLib === 'undefined') {
-        container.innerHTML = '<div class="preview-error">PDF.js library not loaded.</div>';
-        return;
-      }
-      container.innerHTML = '';
-      var wrapper = document.createElement('div');
-      wrapper.className = 'preview-pdf';
-      container.appendChild(wrapper);
-
-      var pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      for (var i = 1; i <= pdf.numPages; i++) {
-        var page = await pdf.getPage(i);
-        var viewport = page.getViewport({ scale: 1.2 });
-        var canvas = document.createElement('canvas');
-        canvas.className = 'pdf-page-canvas';
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        wrapper.appendChild(canvas);
-
-        await page.render({
-          canvasContext: canvas.getContext('2d'),
-          viewport: viewport
-        }).promise;
-      }
-    },
-
-    /** Render an image from ArrayBuffer. */
-    renderImage(arrayBuffer, mimeType, container) {
-      var blob = new Blob([arrayBuffer], { type: mimeType || 'image/png' });
-      var url = URL.createObjectURL(blob);
-      container.innerHTML = '<div class="preview-image"><img src="' + url + '" alt="Preview"></div>';
-    },
-
-    /** Render a text file (txt, md, json, js, css, html, xml, csv). */
-    renderText(arrayBuffer, container) {
-      var text = new TextDecoder('utf-8').decode(arrayBuffer);
-      var pre = document.createElement('pre');
-      pre.className = 'preview-text';
-      pre.textContent = text;
-      container.innerHTML = '';
-      container.appendChild(pre);
-    },
-
-    /** Render an unsupported file type with download prompt. */
-    renderUnsupported(file, container) {
-      var ft = getFileType(file.name);
-      container.innerHTML =
-        '<div class="preview-unsupported">' +
-        '  <i data-lucide="' + ft.icon + '" style="width:64px;height:64px;color:' + ft.color + '"></i>' +
-        '  <h3>' + UI._esc(file.name) + '</h3>' +
-        '  <p>Preview not available for this file type.</p>' +
-        '  <button class="btn btn-primary preview-download-prompt" type="button">' +
-        '    <i data-lucide="download"></i> Download' +
-        '  </button>' +
-        '</div>';
-      lucide.createIcons({ nodes: [container] });
-
-      // Bind download button
-      var btn = container.querySelector('.preview-download-prompt');
-      if (btn) {
-        btn.addEventListener('click', function () { FileOps.download(file.id); });
       }
     }
   };
@@ -1743,12 +1592,34 @@
       });
     }
 
+    var viewerRenameBtn = $('viewer-rename-btn');
+    if (viewerRenameBtn) {
+      viewerRenameBtn.addEventListener('click', function () {
+        if (Viewer.currentFile) {
+          var newName = prompt('Rename file:', Viewer.currentFile.name);
+          if (newName && newName.trim() && newName !== Viewer.currentFile.name) {
+            FileOps.rename(Viewer.currentFile.id, newName.trim()).then(function () {
+              Storage.getFile(Viewer.currentFile.id).then(function (updated) {
+                if (updated) {
+                  Viewer.currentFile = updated;
+                  var fn = $('viewer-filename');
+                  if (fn) fn.textContent = updated.name;
+                }
+              });
+            });
+          }
+        }
+      });
+    }
+
     var viewerDeleteBtn = $('viewer-delete-btn');
     if (viewerDeleteBtn) {
       viewerDeleteBtn.addEventListener('click', function () {
         if (Viewer.currentFile) {
-          FileOps.delete(Viewer.currentFile.id);
-          Viewer.close();
+          if (confirm('Move "' + Viewer.currentFile.name + '" to trash?')) {
+            FileOps.delete(Viewer.currentFile.id);
+            Viewer.close();
+          }
         }
       });
     }
@@ -1825,7 +1696,7 @@
     var copyLinkBtn = $('copy-link-btn');
     if (copyLinkBtn) {
       copyLinkBtn.addEventListener('click', function () {
-        var fid = $('preview-panel').dataset.fileId;
+        var fid = Viewer.currentFile ? Viewer.currentFile.id : ($('viewer-modal') ? $('viewer-modal').dataset.fileId : null);
         if (fid) FileOps.copyShareLink(fid);
       });
     }

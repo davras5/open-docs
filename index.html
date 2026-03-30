@@ -50,9 +50,9 @@
       <button class="icon-btn" id="settings-btn" type="button" aria-label="Settings">
         <i data-lucide="settings"></i>
       </button>
-      <div class="user-avatar" id="user-avatar" title="David Mitchell">
+      <button class="user-avatar" id="user-avatar" type="button" title="David Mitchell" aria-label="User profile">
         <span>DM</span>
-      </div>
+      </button>
     </div>
   </nav>
 
@@ -129,6 +129,7 @@
             <i data-lucide="folder-plus"></i>
             <span>New Folder</span>
           </button>
+          <span class="file-count" id="file-count" hidden></span>
         </div>
 
         <div class="toolbar-right">
@@ -209,6 +210,10 @@
         <button class="viewer-action-btn" id="viewer-open-word-btn" type="button" title="Open in Microsoft Word">
           <i data-lucide="external-link"></i>
           <span>Open in Word</span>
+        </button>
+        <button class="viewer-action-btn" id="viewer-rename-btn" type="button" title="Rename">
+          <i data-lucide="type"></i>
+          <span>Rename</span>
         </button>
         <button class="viewer-action-btn" id="viewer-upload-version-btn" type="button" title="Upload new version">
           <i data-lucide="upload"></i>
