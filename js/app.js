@@ -1085,6 +1085,8 @@
 
   var Viewer = {
     currentFile: null,
+    siblingFiles: [],  // files in the same folder (non-folder only)
+    currentIndex: -1,
 
     async open(file) {
       this.currentFile = file;
@@ -1093,6 +1095,9 @@
       var filename = $('viewer-filename');
       var metaBrief = $('viewer-meta-brief');
       if (!modal || !content) return;
+
+      // Build sibling list for prev/next navigation
+      await this._loadSiblings(file);
 
       // Set header info
       if (filename) filename.textContent = file.name;
@@ -1107,10 +1112,17 @@
       if (editBtn) editBtn.style.display = (ext === 'docx' || ext === 'doc') ? '' : 'none';
       if (openWordBtn) openWordBtn.style.display = (ext === 'docx' || ext === 'doc') ? '' : 'none';
 
+      // Update nav arrows
+      this._updateNav();
+
       // Show loading state
       content.innerHTML = '<div class="preview-loading"><i data-lucide="loader-2" class="spin"></i><span>Loading preview...</span></div>';
       modal.hidden = false;
       lucide.createIcons({ nodes: [content] });
+
+      // Scroll body to top
+      var body = $('viewer-body');
+      if (body) body.scrollTop = 0;
 
       // Store file ID on modal
       modal.dataset.fileId = file.id;
@@ -1142,6 +1154,46 @@
       var modal = $('viewer-modal');
       if (modal) modal.hidden = true;
       this.currentFile = null;
+      this.siblingFiles = [];
+      this.currentIndex = -1;
+    },
+
+    async prev() {
+      if (this.currentIndex > 0) {
+        await this.open(this.siblingFiles[this.currentIndex - 1]);
+      }
+    },
+
+    async next() {
+      if (this.currentIndex < this.siblingFiles.length - 1) {
+        await this.open(this.siblingFiles[this.currentIndex + 1]);
+      }
+    },
+
+    async _loadSiblings(file) {
+      // Get all non-folder files in the same parent
+      var allFiles = await Storage.listFiles(file.parentId, {
+        sortBy: UI.sortBy, sortOrder: UI.sortOrder
+      });
+      this.siblingFiles = allFiles.filter(function (f) { return f.type !== 'folder'; });
+      this.currentIndex = -1;
+      for (var i = 0; i < this.siblingFiles.length; i++) {
+        if (this.siblingFiles[i].id === file.id) { this.currentIndex = i; break; }
+      }
+    },
+
+    _updateNav() {
+      var prevBtn = $('viewer-prev-btn');
+      var nextBtn = $('viewer-next-btn');
+      var counter = $('viewer-file-counter');
+
+      if (prevBtn) prevBtn.hidden = this.currentIndex <= 0;
+      if (nextBtn) nextBtn.hidden = this.currentIndex >= this.siblingFiles.length - 1;
+      if (counter && this.siblingFiles.length > 1) {
+        counter.textContent = (this.currentIndex + 1) + ' of ' + this.siblingFiles.length;
+      } else if (counter) {
+        counter.textContent = '';
+      }
     },
 
     async renderDocx(arrayBuffer, container) {
@@ -1633,6 +1685,20 @@
       });
     }
 
+    // -- Viewer prev/next navigation --
+    var viewerPrevBtn = $('viewer-prev-btn');
+    var viewerNextBtn = $('viewer-next-btn');
+    if (viewerPrevBtn) viewerPrevBtn.addEventListener('click', function () { Viewer.prev(); });
+    if (viewerNextBtn) viewerNextBtn.addEventListener('click', function () { Viewer.next(); });
+
+    // -- Click on viewer overlay background to close --
+    var viewerBody = $('viewer-body');
+    if (viewerBody) {
+      viewerBody.addEventListener('click', function (e) {
+        if (e.target === viewerBody) Viewer.close();
+      });
+    }
+
     // -- Share modal: copy link --
     var copyLinkBtn = $('copy-link-btn');
     if (copyLinkBtn) {
@@ -1738,23 +1804,26 @@
 
     // -- Keyboard shortcuts --
     document.addEventListener('keydown', function (e) {
-      // Escape: close modals/preview/context menu
+      var viewerOpen = $('viewer-modal') && !$('viewer-modal').hidden;
+
+      // Escape: close viewer, modals, context menu
       if (e.key === 'Escape') {
         ContextMenu.hide();
+        if (viewerOpen) { Viewer.close(); return; }
 
-        // Close any open modal
         var modals = document.querySelectorAll('.modal-overlay:not([hidden])');
         if (modals.length > 0) {
           modals.forEach(function (m) { m.hidden = true; });
           return;
         }
-
-        // Close preview
-        UI.hidePreview();
       }
 
+      // Arrow keys: navigate files in viewer
+      if (viewerOpen && e.key === 'ArrowLeft') { e.preventDefault(); Viewer.prev(); }
+      if (viewerOpen && e.key === 'ArrowRight') { e.preventDefault(); Viewer.next(); }
+
       // Delete key: trash selected file (only if not typing in an input)
-      if (e.key === 'Delete' && UI.selectedFile) {
+      if (e.key === 'Delete' && UI.selectedFile && !viewerOpen) {
         var tag = document.activeElement.tagName.toLowerCase();
         if (tag !== 'input' && tag !== 'textarea' && !document.activeElement.isContentEditable) {
           e.preventDefault();

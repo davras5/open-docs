@@ -193,50 +193,61 @@
 
   </div><!-- /.app-layout -->
 
-  <!-- ========== DOCUMENT VIEWER MODAL ========== -->
-  <div class="modal-overlay viewer-overlay" id="viewer-modal" role="dialog" aria-modal="true" aria-labelledby="viewer-modal-title" hidden>
-    <div class="viewer-modal">
-      <div class="viewer-header">
-        <div class="viewer-header-left">
-          <button class="icon-btn" id="viewer-back-btn" type="button" aria-label="Close">
-            <i data-lucide="arrow-left"></i>
-          </button>
-          <div class="viewer-file-info">
-            <h2 class="viewer-filename" id="viewer-filename">filename.ext</h2>
-            <span class="viewer-meta" id="viewer-meta-brief"></span>
-          </div>
-        </div>
-        <div class="viewer-header-actions">
-          <button class="btn btn-secondary" id="viewer-edit-btn" type="button" title="Edit in browser">
-            <i data-lucide="pencil"></i>
-            <span>Edit</span>
-          </button>
-          <button class="btn btn-secondary" id="viewer-open-word-btn" type="button" title="Open in Microsoft Word">
-            <i data-lucide="external-link"></i>
-            <span>Open in Word</span>
-          </button>
-          <button class="btn btn-secondary" id="viewer-upload-version-btn" type="button" title="Upload new version">
-            <i data-lucide="upload"></i>
-            <span>New Version</span>
-          </button>
-          <button class="btn btn-primary" id="viewer-download-btn" type="button" title="Download">
-            <i data-lucide="download"></i>
-            <span>Download</span>
-          </button>
-          <div class="viewer-header-divider"></div>
-          <button class="btn btn-secondary" id="viewer-share-btn" type="button" title="Share">
-            <i data-lucide="share-2"></i>
-          </button>
-          <button class="btn btn-danger" id="viewer-delete-btn" type="button" title="Delete">
-            <i data-lucide="trash-2"></i>
-          </button>
-        </div>
+  <!-- ========== DOCUMENT VIEWER (Confluence-style) ========== -->
+  <div class="viewer-overlay" id="viewer-modal" hidden>
+    <!-- Top bar -->
+    <div class="viewer-topbar">
+      <div class="viewer-topbar-left">
+        <h2 class="viewer-filename" id="viewer-filename">filename.ext</h2>
+        <span class="viewer-meta" id="viewer-meta-brief"></span>
       </div>
-      <div class="viewer-body">
-        <div class="viewer-content" id="viewer-content">
-          <!-- Document preview rendered here by JS -->
-        </div>
+      <div class="viewer-topbar-actions">
+        <button class="viewer-action-btn" id="viewer-edit-btn" type="button" title="Edit in browser">
+          <i data-lucide="pencil"></i>
+          <span>Edit</span>
+        </button>
+        <button class="viewer-action-btn" id="viewer-open-word-btn" type="button" title="Open in Microsoft Word">
+          <i data-lucide="external-link"></i>
+          <span>Open in Word</span>
+        </button>
+        <button class="viewer-action-btn" id="viewer-upload-version-btn" type="button" title="Upload new version">
+          <i data-lucide="upload"></i>
+          <span>New Version</span>
+        </button>
+        <button class="viewer-action-btn" id="viewer-download-btn" type="button" title="Download">
+          <i data-lucide="download"></i>
+          <span>Download</span>
+        </button>
+        <button class="viewer-action-btn" id="viewer-share-btn" type="button" title="Share">
+          <i data-lucide="share-2"></i>
+        </button>
+        <button class="viewer-action-btn" id="viewer-delete-btn" type="button" title="Delete">
+          <i data-lucide="trash-2"></i>
+        </button>
       </div>
+      <button class="viewer-close-btn" id="viewer-back-btn" type="button" aria-label="Close">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+
+    <!-- Navigation arrows -->
+    <button class="viewer-nav viewer-nav-prev" id="viewer-prev-btn" type="button" aria-label="Previous file" hidden>
+      <i data-lucide="chevron-left"></i>
+    </button>
+    <button class="viewer-nav viewer-nav-next" id="viewer-next-btn" type="button" aria-label="Next file" hidden>
+      <i data-lucide="chevron-right"></i>
+    </button>
+
+    <!-- Scrollable content area -->
+    <div class="viewer-body" id="viewer-body">
+      <div class="viewer-content" id="viewer-content">
+        <!-- Document preview rendered here by JS -->
+      </div>
+    </div>
+
+    <!-- Bottom file counter -->
+    <div class="viewer-bottombar" id="viewer-bottombar">
+      <span id="viewer-file-counter"></span>
     </div>
   </div>
 
