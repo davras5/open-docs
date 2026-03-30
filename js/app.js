@@ -1118,6 +1118,7 @@
       // Show loading state
       content.innerHTML = '<div class="preview-loading"><i data-lucide="loader-2" class="spin"></i><span>Loading preview...</span></div>';
       content.classList.remove('viewer-content-media');
+      this._destroyZoom();
       modal.hidden = false;
       lucide.createIcons({ nodes: [content] });
 
@@ -1162,6 +1163,7 @@
       this.currentFile = null;
       this.siblingFiles = [];
       this.currentIndex = -1;
+      this._destroyZoom();
     },
 
     async prev() {
@@ -1252,10 +1254,116 @@
       }
     },
 
+    // -- Zoom state --
+    _zoom: null,
+
+    _initZoom(imgEl) {
+      var self = this;
+      var z = {
+        scale: 1, minScale: 1, maxScale: 8,
+        panX: 0, panY: 0,
+        dragging: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0,
+        img: imgEl, wrapper: imgEl.parentElement
+      };
+      this._zoom = z;
+
+      function apply() {
+        z.img.style.transform = 'translate(' + z.panX + 'px,' + z.panY + 'px) scale(' + z.scale + ')';
+        z.img.style.cursor = z.scale > z.minScale ? 'grab' : 'zoom-in';
+        var indicator = $('viewer-zoom-level');
+        if (indicator) indicator.textContent = Math.round(z.scale * 100) + '%';
+        var controls = $('viewer-zoom-controls');
+        if (controls) controls.hidden = false;
+      }
+
+      function clampPan() {
+        if (z.scale <= z.minScale) { z.panX = 0; z.panY = 0; return; }
+        var rect = z.wrapper.getBoundingClientRect();
+        var displayW = rect.width * z.scale;
+        var displayH = rect.height * z.scale;
+        var maxPanX = Math.max(0, (displayW - rect.width) / 2);
+        var maxPanY = Math.max(0, (displayH - rect.height) / 2);
+        z.panX = Math.max(-maxPanX, Math.min(maxPanX, z.panX));
+        z.panY = Math.max(-maxPanY, Math.min(maxPanY, z.panY));
+      }
+
+      z._onWheel = function (e) {
+        e.preventDefault();
+        var delta = e.deltaY > 0 ? 0.85 : 1.18;
+        z.scale = Math.max(z.minScale, Math.min(z.maxScale, z.scale * delta));
+        if (z.scale <= z.minScale + 0.01) { z.scale = z.minScale; z.panX = 0; z.panY = 0; }
+        clampPan(); apply();
+      };
+
+      z._onDblClick = function (e) {
+        e.preventDefault(); e.stopPropagation();
+        if (z.scale > z.minScale + 0.01) {
+          z.scale = z.minScale; z.panX = 0; z.panY = 0;
+        } else {
+          z.scale = Math.min(z.maxScale, 2);
+          var rect = z.wrapper.getBoundingClientRect();
+          z.panX = (rect.width / 2 - (e.clientX - rect.left)) * 0.5;
+          z.panY = (rect.height / 2 - (e.clientY - rect.top)) * 0.5;
+          clampPan();
+        }
+        apply();
+      };
+
+      z._onMouseDown = function (e) {
+        if (z.scale <= z.minScale) return;
+        e.preventDefault();
+        z.dragging = true;
+        z.startX = e.clientX; z.startY = e.clientY;
+        z.startPanX = z.panX; z.startPanY = z.panY;
+        z.img.style.cursor = 'grabbing';
+      };
+      z._onMouseMove = function (e) {
+        if (!z.dragging) return;
+        z.panX = z.startPanX + (e.clientX - z.startX);
+        z.panY = z.startPanY + (e.clientY - z.startY);
+        clampPan(); apply();
+      };
+      z._onMouseUp = function () {
+        z.dragging = false;
+        if (z.img) z.img.style.cursor = z.scale > z.minScale ? 'grab' : 'zoom-in';
+      };
+
+      z.wrapper.addEventListener('wheel', z._onWheel, { passive: false });
+      z.wrapper.addEventListener('dblclick', z._onDblClick);
+      z.img.addEventListener('mousedown', z._onMouseDown);
+      document.addEventListener('mousemove', z._onMouseMove);
+      document.addEventListener('mouseup', z._onMouseUp);
+
+      z.zoomIn = function () { z.scale = Math.min(z.maxScale, z.scale * 1.3); clampPan(); apply(); };
+      z.zoomOut = function () {
+        z.scale = Math.max(z.minScale, z.scale * 0.7);
+        if (z.scale <= z.minScale + 0.01) { z.scale = z.minScale; z.panX = 0; z.panY = 0; }
+        clampPan(); apply();
+      };
+      z.zoomFit = function () { z.scale = z.minScale; z.panX = 0; z.panY = 0; apply(); };
+
+      apply();
+    },
+
+    _destroyZoom() {
+      var z = this._zoom;
+      if (!z) return;
+      if (z.wrapper) { z.wrapper.removeEventListener('wheel', z._onWheel); z.wrapper.removeEventListener('dblclick', z._onDblClick); }
+      if (z.img) z.img.removeEventListener('mousedown', z._onMouseDown);
+      document.removeEventListener('mousemove', z._onMouseMove);
+      document.removeEventListener('mouseup', z._onMouseUp);
+      var controls = $('viewer-zoom-controls');
+      if (controls) controls.hidden = true;
+      this._zoom = null;
+    },
+
     renderImage(arrayBuffer, mimeType, container) {
+      var self = this;
       var blob = new Blob([arrayBuffer], { type: mimeType || 'image/png' });
       var url = URL.createObjectURL(blob);
-      container.innerHTML = '<div class="preview-image"><img src="' + url + '" alt="Preview"></div>';
+      container.innerHTML = '<div class="preview-image"><img src="' + url + '" alt="Preview" draggable="false"></div>';
+      var img = container.querySelector('img');
+      if (img) { img.onload = function () { self._initZoom(img); }; }
     },
 
     renderText(arrayBuffer, filename, container) {
@@ -1704,6 +1812,14 @@
         if (e.target === viewerBody) Viewer.close();
       });
     }
+
+    // -- Zoom controls --
+    var zoomInBtn = $('viewer-zoom-in');
+    var zoomOutBtn = $('viewer-zoom-out');
+    var zoomFitBtn = $('viewer-zoom-fit');
+    if (zoomInBtn) zoomInBtn.addEventListener('click', function () { if (Viewer._zoom) Viewer._zoom.zoomIn(); });
+    if (zoomOutBtn) zoomOutBtn.addEventListener('click', function () { if (Viewer._zoom) Viewer._zoom.zoomOut(); });
+    if (zoomFitBtn) zoomFitBtn.addEventListener('click', function () { if (Viewer._zoom) Viewer._zoom.zoomFit(); });
 
     // -- Share modal: copy link --
     var copyLinkBtn = $('copy-link-btn');

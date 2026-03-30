@@ -245,9 +245,21 @@
       </div>
     </div>
 
-    <!-- Bottom file counter -->
+    <!-- Bottom bar: file counter + zoom controls -->
     <div class="viewer-bottombar" id="viewer-bottombar">
       <span id="viewer-file-counter"></span>
+      <div class="viewer-zoom-controls" id="viewer-zoom-controls" hidden>
+        <button class="viewer-zoom-btn" id="viewer-zoom-out" type="button" aria-label="Zoom out">
+          <i data-lucide="minus"></i>
+        </button>
+        <span class="viewer-zoom-level" id="viewer-zoom-level">100%</span>
+        <button class="viewer-zoom-btn" id="viewer-zoom-in" type="button" aria-label="Zoom in">
+          <i data-lucide="plus"></i>
+        </button>
+        <button class="viewer-zoom-btn" id="viewer-zoom-fit" type="button" aria-label="Fit to screen" title="Fit to screen">
+          <i data-lucide="maximize-2"></i>
+        </button>
+      </div>
     </div>
   </div>
 

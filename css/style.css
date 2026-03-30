@@ -2205,6 +2205,7 @@ img {
 .viewer-body {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   justify-content: center;
   padding: 0 80px;
@@ -2221,7 +2222,7 @@ img {
   line-height: 1.7;
   color: #1e293b;
   box-shadow: 0 -2px 40px rgba(0, 0, 0, 0.3);
-  min-height: calc(100vh - 120px);
+  margin-top: 8px;
 }
 
 /* Bottom bar */
@@ -2229,10 +2230,12 @@ img {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 36px;
+  gap: 16px;
+  height: 40px;
   flex-shrink: 0;
   color: rgba(255, 255, 255, 0.4);
   font-size: 12px;
+  padding: 0 16px;
 }
 
 /* Media mode — no white paper, content floats on dark bg */
@@ -2249,12 +2252,55 @@ img {
 
 .viewer-content.viewer-content-media .preview-image {
   min-height: auto;
+  overflow: hidden;
 }
 
 .viewer-content.viewer-content-media .preview-image img {
   max-height: calc(100vh - 120px);
   border-radius: 6px;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  transform-origin: center center;
+  transition: none;
+  user-select: none;
+}
+
+/* Zoom controls in bottom bar */
+.viewer-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+
+.viewer-zoom-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.6);
+  transition: all 0.15s ease;
+}
+
+.viewer-zoom-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.viewer-zoom-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.viewer-zoom-level {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  min-width: 40px;
+  text-align: center;
 }
 
 /* Docx preview */
