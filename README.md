@@ -294,6 +294,7 @@ Built on a **CSS custom property token system** (`css/tokens.css`):
 | Point cloud viewer (.las/.laz) | High | Potree; needs backend tiling for large scans |
 | 360-degree photo viewer | Medium | Pannellum; feasible client-side |
 | Office tool plugins | Medium | Microsoft 365 / Google Workspace add-ins |
+| Windows folder sync plugin | Medium | Desktop tray app or shell extension to sync a local folder with OpenDocs |
 | Wiki & project management | Very High | Kanban, backlog, issues, markdown wiki |
 | PDF annotation & markup | Medium | Draw, highlight, comment as separate layer |
 | Offline-first with sync | High | Service Worker + CRDTs for eventual consistency |

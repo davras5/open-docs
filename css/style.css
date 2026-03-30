@@ -1659,7 +1659,9 @@ textarea:focus-visible {
 
 .settings-view {
   grid-column: 1 / -1;
+  grid-row: 1 / -1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: #f8fafc;
 }
 
@@ -1913,7 +1915,9 @@ textarea:focus-visible {
 
 .api-docs-view {
   grid-column: 1 / -1;
+  grid-row: 1 / -1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--color-bg);
 }
 
@@ -2733,10 +2737,40 @@ textarea:focus-visible {
     border-left: none;
   }
 
-  /* Footer: smaller */
+  /* Footer: smaller, ensure tappable API button */
   .app-footer {
     height: 28px;
     padding: 0 12px;
     font-size: 10px;
+  }
+
+  .footer-link {
+    min-height: var(--size-touch);
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* API docs: tighter padding on phone */
+  .api-docs-body {
+    padding: 16px 12px 48px;
+  }
+
+  .panel-header {
+    padding: 12px 16px;
+  }
+
+  .api-endpoint-header {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .api-endpoint-detail {
+    padding: 8px 10px;
+  }
+
+  .api-summary {
+    margin-left: 0;
+    width: 100%;
   }
 }
