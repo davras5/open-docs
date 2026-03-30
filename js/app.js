@@ -412,8 +412,46 @@
           ' &middot; ' + formatDate(file.modifiedAt) +
         '</div>';
 
+      // Load thumbnail for images and PDFs
+      if (ft.category === 'image' || ft.category === 'pdf') {
+        this._loadThumbnail(card, file, ft);
+      }
+
       this._bindFileEvents(card, file);
       return card;
+    },
+
+    /** Async-load a thumbnail into a file card's icon area. */
+    _loadThumbnail(card, file, ft) {
+      var iconDiv = card.querySelector('.file-card-icon');
+      if (!iconDiv) return;
+
+      Storage.getData(file.id).then(function (data) {
+        if (!data || !iconDiv.parentNode) return; // card removed from DOM
+
+        if (ft.category === 'image') {
+          var blob = new Blob([data], { type: file.mimeType || 'image/jpeg' });
+          var url = URL.createObjectURL(blob);
+          iconDiv.innerHTML = '';
+          iconDiv.classList.add('file-card-thumb');
+          iconDiv.style.backgroundImage = 'url(' + url + ')';
+        } else if (ft.category === 'pdf' && typeof pdfjsLib !== 'undefined') {
+          pdfjsLib.getDocument({ data: data }).promise.then(function (pdf) {
+            return pdf.getPage(1);
+          }).then(function (page) {
+            var vp = page.getViewport({ scale: 0.5 });
+            var canvas = document.createElement('canvas');
+            canvas.width = vp.width;
+            canvas.height = vp.height;
+            return page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise.then(function () {
+              if (!iconDiv.parentNode) return;
+              iconDiv.innerHTML = '';
+              iconDiv.classList.add('file-card-thumb');
+              iconDiv.style.backgroundImage = 'url(' + canvas.toDataURL() + ')';
+            });
+          }).catch(function () { /* keep icon fallback */ });
+        }
+      }).catch(function () { /* keep icon fallback */ });
     },
 
     /** Create a list-view table row for a file. */

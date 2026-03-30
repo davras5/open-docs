@@ -682,6 +682,13 @@ textarea:focus-visible {
   height: 40px;
 }
 
+.file-card-icon.file-card-thumb {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  height: 120px;
+}
+
 .file-card-name {
   font-size: 13px;
   font-weight: 500;
