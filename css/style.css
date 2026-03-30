@@ -1658,7 +1658,7 @@ textarea:focus-visible {
   background: #f8fafc;
 }
 
-.settings-header {
+.panel-header {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1670,7 +1670,7 @@ textarea:focus-visible {
   z-index: 10;
 }
 
-.settings-title {
+.panel-title {
   font-size: 20px;
   font-weight: 700;
   color: #1e293b;
@@ -1836,12 +1836,12 @@ textarea:focus-visible {
   background: #0f172a;
 }
 
-.dark-theme .settings-header {
+.dark-theme .panel-header {
   background: #1e293b;
   border-bottom-color: #334155;
 }
 
-.dark-theme .settings-title {
+.dark-theme .panel-title {
   color: #f1f5f9;
 }
 
@@ -1892,7 +1892,6 @@ textarea:focus-visible {
 .footer-link {
   color: var(--color-text-secondary);
   text-decoration: none;
-  font-size: var(--text-xs);
   transition: color var(--duration-fast) var(--easing-default);
 }
 
@@ -1996,10 +1995,10 @@ textarea:focus-visible {
   flex-shrink: 0;
 }
 
-.api-get    { background: #2563eb; }
-.api-post   { background: #16a34a; }
-.api-put    { background: #d97706; }
-.api-delete { background: #dc2626; }
+.api-get    { background: var(--color-primary); }
+.api-post   { background: var(--color-success); }
+.api-put    { background: var(--amber-600); }
+.api-delete { background: var(--color-danger); }
 
 .api-path {
   font-family: var(--font-family-mono);
