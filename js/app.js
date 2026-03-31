@@ -207,6 +207,9 @@
         // Deleted filter
         if (options.deleted) return f.deleted === true;
         if (!options.deleted && f.deleted) return false;
+        // Wiki items are separate from normal file listings
+        if (!options.wikiPage && f.wikiPage) return false;
+        if (options.wikiPage) return f.wikiPage === true;
         // Shared filter
         if (options.shared) return f.shared === true;
         // Recent — all non-deleted files
@@ -253,6 +256,20 @@
         if (!value.deleted && value.name && value.name.toLowerCase().indexOf(q) !== -1) {
           results.push(value);
         }
+      });
+      return results;
+    },
+
+    /** List all wiki items (pages and folders). */
+    async listAllWikiItems() {
+      var results = [];
+      await fileStore.iterate(function (value) {
+        if (value.wikiPage && !value.deleted) results.push(value);
+      });
+      results.sort(function (a, b) {
+        if (a.type === 'folder' && b.type !== 'folder') return -1;
+        if (a.type !== 'folder' && b.type === 'folder') return 1;
+        return (a.name || '').localeCompare(b.name || '');
       });
       return results;
     },
@@ -675,6 +692,16 @@
         item.classList.toggle('active', item.dataset.nav === section);
       });
 
+      // When switching to a file section, hide wiki view and restore file browser
+      var wikiView = $('wiki-view');
+      var fileBrowser = $('file-browser');
+      var toolbar = $('toolbar');
+      var breadcrumbBar = $('breadcrumb-bar');
+      if (wikiView) wikiView.hidden = true;
+      if (fileBrowser) fileBrowser.hidden = false;
+      if (toolbar) toolbar.hidden = false;
+      if (breadcrumbBar) breadcrumbBar.hidden = false;
+
       // Show/hide upload and new-folder buttons outside trash/shared/recent
       var showActions = section === 'my-files';
       if ($('upload-btn')) $('upload-btn').style.display = showActions ? '' : 'none';
@@ -1028,6 +1055,390 @@
     close() {
       this.currentFileId = null;
       UI.closeModal('editor-modal');
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Wiki Module
+  // ---------------------------------------------------------------------------
+
+  var Wiki = {
+    currentPageId: null,
+    editorInstance: null,
+    isEditing: false,
+    treeExpandedFolders: JSON.parse(localStorage.getItem('opendocs-wiki-expanded') || '[]'),
+    _currentMarkdown: '',
+
+    /** Show wiki layout in main content (hide file browser, show wiki view). */
+    _showWikiLayout() {
+      var wikiView = $('wiki-view');
+      var fileBrowser = $('file-browser');
+      var toolbar = $('toolbar');
+      var breadcrumbBar = $('breadcrumb-bar');
+      if (wikiView) wikiView.hidden = false;
+      if (fileBrowser) fileBrowser.hidden = true;
+      if (toolbar) toolbar.hidden = true;
+      if (breadcrumbBar) breadcrumbBar.hidden = true;
+      // Deselect file nav items
+      document.querySelectorAll('.nav-item[data-nav]').forEach(function (item) {
+        item.classList.remove('active');
+      });
+    },
+
+    /** Slugify a title for URL use. */
+    slugify(title) {
+      return (title || 'untitled').toLowerCase()
+        .replace(/[äÄ]/g, 'ae').replace(/[öÖ]/g, 'oe').replace(/[üÜ]/g, 'ue').replace(/ß/g, 'ss')
+        .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    },
+
+    /** Render the wiki tree in the sidebar. */
+    async renderTree() {
+      var container = $('wiki-tree');
+      if (!container) return;
+
+      var items = await Storage.listAllWikiItems();
+      container.innerHTML = '';
+
+      if (items.length === 0) {
+        container.innerHTML = '<div style="padding:12px;color:var(--color-text-secondary);font-size:13px;">No pages yet</div>';
+        return;
+      }
+
+      var ul = this._buildTreeLevel(items, null);
+      container.appendChild(ul);
+      lucide.createIcons({ nodes: [container] });
+    },
+
+    /** Build a tree level recursively. */
+    _buildTreeLevel(allItems, parentId) {
+      var self = this;
+      var children = allItems.filter(function (item) {
+        return item.parentId === (parentId || null);
+      });
+
+      var ul = document.createElement('ul');
+      ul.className = 'wiki-tree-list';
+
+      children.forEach(function (item) {
+        var li = document.createElement('li');
+        li.className = 'wiki-tree-item';
+
+        var node = document.createElement('div');
+        node.className = 'wiki-tree-node';
+        if (item.id === self.currentPageId) node.classList.add('active');
+
+        var isFolder = item.type === 'folder';
+        var hasChildren = allItems.some(function (c) { return c.parentId === item.id; });
+
+        // Toggle chevron
+        var toggle = document.createElement('button');
+        toggle.className = 'wiki-tree-toggle' + (hasChildren ? '' : ' leaf');
+        toggle.type = 'button';
+        if (hasChildren) {
+          var expanded = self.treeExpandedFolders.indexOf(item.id) !== -1;
+          toggle.innerHTML = '<i data-lucide="' + (expanded ? 'chevron-down' : 'chevron-right') + '"></i>';
+          toggle.addEventListener('click', function (e) {
+            e.stopPropagation();
+            self.toggleFolder(item.id);
+          });
+        }
+
+        // Icon
+        var icon = document.createElement('span');
+        icon.className = 'wiki-tree-icon';
+        icon.innerHTML = '<i data-lucide="' + (isFolder ? 'folder' : 'file-text') + '"></i>';
+
+        // Label
+        var label = document.createElement('span');
+        label.className = 'wiki-tree-label';
+        label.textContent = item.name;
+
+        node.appendChild(toggle);
+        node.appendChild(icon);
+        node.appendChild(label);
+
+        // Click handler
+        if (isFolder) {
+          node.addEventListener('click', function () {
+            self.toggleFolder(item.id);
+          });
+        } else {
+          node.addEventListener('click', function () {
+            Router.go('wiki/' + (item.slug || item.id));
+          });
+        }
+
+        li.appendChild(node);
+
+        // Children
+        if (hasChildren) {
+          var childUl = self._buildTreeLevel(allItems, item.id);
+          childUl.classList.add('wiki-tree-children');
+          var expanded = self.treeExpandedFolders.indexOf(item.id) !== -1;
+          if (!expanded) childUl.hidden = true;
+          li.appendChild(childUl);
+        }
+
+        ul.appendChild(li);
+      });
+
+      return ul;
+    },
+
+    /** Toggle a folder's expanded/collapsed state. */
+    toggleFolder(folderId) {
+      var idx = this.treeExpandedFolders.indexOf(folderId);
+      if (idx === -1) {
+        this.treeExpandedFolders.push(folderId);
+      } else {
+        this.treeExpandedFolders.splice(idx, 1);
+      }
+      localStorage.setItem('opendocs-wiki-expanded', JSON.stringify(this.treeExpandedFolders));
+      this.renderTree();
+    },
+
+    /** Show the wiki home page (slug = 'home'). */
+    async showHome() {
+      var page = await this.getPageBySlug('home');
+      if (page) {
+        this.openPage(page.id);
+      } else {
+        // Show empty/welcome state
+        var content = $('wiki-page-content');
+        var header = $('wiki-page-header');
+        var editorWrapper = $('wiki-editor-wrapper');
+        if (header) header.hidden = true;
+        if (editorWrapper) editorWrapper.hidden = true;
+        if (content) {
+          content.innerHTML =
+            '<div class="wiki-empty">' +
+            '  <i data-lucide="book-open" class="wiki-empty-icon"></i>' +
+            '  <h2>Welcome to the Wiki</h2>' +
+            '  <p>Create your first page to get started.</p>' +
+            '  <button class="btn btn-primary" id="wiki-create-home-btn" type="button">' +
+            '    <i data-lucide="plus"></i> Create Home Page' +
+            '  </button>' +
+            '</div>';
+          lucide.createIcons({ nodes: [content] });
+          var createHomeBtn = $('wiki-create-home-btn');
+          if (createHomeBtn) {
+            var self = this;
+            createHomeBtn.addEventListener('click', function () {
+              self.createPage('Projekt-Wiki', null, 'home');
+            });
+          }
+        }
+      }
+    },
+
+    /** Open a wiki page by slug. */
+    async openPageBySlug(slug) {
+      var page = await this.getPageBySlug(slug);
+      if (page) {
+        this.openPage(page.id);
+      } else {
+        UI.showToast('Wiki page not found', 'error');
+        this.showHome();
+      }
+    },
+
+    /** Open a wiki page by ID. */
+    async openPage(pageId) {
+      var meta = await Storage.getFile(pageId);
+      if (!meta) { UI.showToast('Page not found', 'error'); return; }
+
+      this.currentPageId = pageId;
+      this.isEditing = false;
+      this.destroyEditor();
+
+      // Ensure wiki UI is visible
+      var wikiView = $('wiki-view');
+      if (wikiView) wikiView.hidden = false;
+
+      // Load markdown content
+      var data = await Storage.getData(pageId);
+      var markdown = '';
+      if (data) {
+        markdown = new TextDecoder().decode(data);
+      }
+      this._currentMarkdown = markdown;
+
+      // Render page
+      var header = $('wiki-page-header');
+      var title = $('wiki-page-title');
+      var content = $('wiki-page-content');
+      var editorWrapper = $('wiki-editor-wrapper');
+
+      if (header) header.hidden = false;
+      if (title) title.textContent = meta.name;
+      if (content) {
+        content.hidden = false;
+        content.innerHTML = this.renderMarkdown(markdown);
+      }
+      if (editorWrapper) editorWrapper.hidden = true;
+
+      // Update tree highlight
+      this.renderTree();
+    },
+
+    /** Render markdown to HTML using marked (bundled with EasyMDE) or fallback. */
+    renderMarkdown(md) {
+      if (typeof marked !== 'undefined') {
+        return marked.parse(md);
+      }
+      // Fallback: use Viewer's basic renderer
+      return Viewer._renderMarkdown(md);
+    },
+
+    /** Switch to edit mode. */
+    startEditing() {
+      if (!this.currentPageId) return;
+      this.isEditing = true;
+
+      var content = $('wiki-page-content');
+      var editorWrapper = $('wiki-editor-wrapper');
+      var textarea = $('wiki-editor-textarea');
+
+      if (content) content.hidden = true;
+      if (editorWrapper) editorWrapper.hidden = false;
+      if (textarea) textarea.value = this._currentMarkdown;
+
+      // Initialize EasyMDE
+      if (typeof EasyMDE !== 'undefined' && !this.editorInstance) {
+        this.editorInstance = new EasyMDE({
+          element: textarea,
+          initialValue: this._currentMarkdown,
+          spellChecker: false,
+          autosave: { enabled: false },
+          toolbar: ['bold', 'italic', 'heading', '|', 'unordered-list', 'ordered-list', '|',
+                    'link', 'image', 'table', '|', 'code', 'quote', 'horizontal-rule', '|',
+                    'preview', 'side-by-side', '|', 'guide'],
+          sideBySideFullscreen: false,
+          status: false,
+          minHeight: '400px',
+          previewClass: ['editor-preview', 'wiki-page-content']
+        });
+      }
+    },
+
+    /** Cancel editing without saving. */
+    cancelEditing() {
+      this.isEditing = false;
+      this.destroyEditor();
+
+      var content = $('wiki-page-content');
+      var editorWrapper = $('wiki-editor-wrapper');
+      if (content) content.hidden = false;
+      if (editorWrapper) editorWrapper.hidden = true;
+    },
+
+    /** Save the current page. */
+    async savePage() {
+      if (!this.currentPageId || !this.editorInstance) return;
+
+      var markdown = this.editorInstance.value();
+      var encoder = new TextEncoder();
+      var buffer = encoder.encode(markdown).buffer;
+
+      await dataStore.setItem(this.currentPageId, buffer);
+      await Storage.updateFile(this.currentPageId, {
+        modifiedAt: Date.now(),
+        size: buffer.byteLength
+      });
+
+      UI.showToast('Page saved', 'success');
+      this._currentMarkdown = markdown;
+      this.cancelEditing();
+
+      // Re-render the page
+      var content = $('wiki-page-content');
+      if (content) {
+        content.innerHTML = this.renderMarkdown(markdown);
+      }
+    },
+
+    /** Destroy the EasyMDE editor instance. */
+    destroyEditor() {
+      if (this.editorInstance) {
+        this.editorInstance.toTextArea();
+        this.editorInstance = null;
+      }
+    },
+
+    /** Create a new wiki page. */
+    async createPage(title, parentFolderId, forceSlug) {
+      if (!title) { UI.showToast('Please enter a page title', 'error'); return; }
+
+      var slug = forceSlug || this.slugify(title);
+
+      // Check for slug collision
+      var existing = await this.getPageBySlug(slug);
+      if (existing) {
+        slug = slug + '-' + Date.now().toString(36);
+      }
+
+      var id = crypto.randomUUID();
+      var defaultContent = '# ' + title + '\n\nStart writing here...\n';
+      var encoder = new TextEncoder();
+      var buffer = encoder.encode(defaultContent).buffer;
+
+      await Storage.saveFile({
+        id: id,
+        name: title,
+        slug: slug,
+        type: 'file',
+        mimeType: 'text/markdown',
+        size: buffer.byteLength,
+        parentId: parentFolderId || null,
+        wikiPage: true,
+        shared: false,
+        deleted: false
+      }, buffer);
+
+      await this.renderTree();
+      Router.go('wiki/' + slug);
+
+      // Auto-open editor for new pages
+      var self = this;
+      setTimeout(function () { self.startEditing(); }, 100);
+    },
+
+    /** Create a new wiki folder. */
+    async createFolder(name) {
+      if (!name) { UI.showToast('Please enter a folder name', 'error'); return; }
+
+      var id = crypto.randomUUID();
+      await Storage.saveFile({
+        id: id,
+        name: name,
+        slug: this.slugify(name),
+        type: 'folder',
+        mimeType: null,
+        size: 0,
+        parentId: null,
+        wikiPage: true,
+        shared: false,
+        deleted: false
+      }, null);
+
+      // Auto-expand new folder
+      this.treeExpandedFolders.push(id);
+      localStorage.setItem('opendocs-wiki-expanded', JSON.stringify(this.treeExpandedFolders));
+
+      await this.renderTree();
+      UI.showToast('Folder created', 'success');
+    },
+
+    /** Find a wiki page by slug. */
+    async getPageBySlug(slug) {
+      var found = null;
+      await fileStore.iterate(function (value) {
+        if (value.wikiPage && !value.deleted && value.slug === slug && value.type !== 'folder') {
+          found = value;
+        }
+      });
+      return found;
     }
   };
 
@@ -2008,6 +2419,74 @@
       });
     }
 
+    // -- Wiki buttons --
+    var wikiEditBtn = $('wiki-edit-btn');
+    if (wikiEditBtn) wikiEditBtn.addEventListener('click', function () { Wiki.startEditing(); });
+
+    var wikiSaveBtn = $('wiki-save-btn');
+    if (wikiSaveBtn) wikiSaveBtn.addEventListener('click', function () { Wiki.savePage(); });
+
+    var wikiCancelBtn = $('wiki-cancel-btn');
+    if (wikiCancelBtn) wikiCancelBtn.addEventListener('click', function () { Wiki.cancelEditing(); });
+
+    var wikiNewPageBtn = $('wiki-new-page-btn');
+    if (wikiNewPageBtn) {
+      wikiNewPageBtn.addEventListener('click', function () {
+        var nameInput = $('wiki-page-name-input');
+        if (nameInput) nameInput.value = '';
+        UI.openModal('wiki-page-modal');
+      });
+    }
+
+    var wikiCreatePageBtn = $('wiki-create-page-btn');
+    if (wikiCreatePageBtn) {
+      wikiCreatePageBtn.addEventListener('click', function () {
+        var nameInput = $('wiki-page-name-input');
+        var name = nameInput ? nameInput.value.trim() : '';
+        Wiki.createPage(name, null);
+        UI.closeModal('wiki-page-modal');
+      });
+    }
+
+    var wikiPageNameInput = $('wiki-page-name-input');
+    if (wikiPageNameInput) {
+      wikiPageNameInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (wikiCreatePageBtn) wikiCreatePageBtn.click();
+        }
+      });
+    }
+
+    var wikiNewFolderBtn = $('wiki-new-folder-btn');
+    if (wikiNewFolderBtn) {
+      wikiNewFolderBtn.addEventListener('click', function () {
+        var nameInput = $('wiki-folder-name-input');
+        if (nameInput) nameInput.value = '';
+        UI.openModal('wiki-folder-modal');
+      });
+    }
+
+    var wikiCreateFolderBtn = $('wiki-create-folder-btn');
+    if (wikiCreateFolderBtn) {
+      wikiCreateFolderBtn.addEventListener('click', function () {
+        var nameInput = $('wiki-folder-name-input');
+        var name = nameInput ? nameInput.value.trim() : '';
+        Wiki.createFolder(name);
+        UI.closeModal('wiki-folder-modal');
+      });
+    }
+
+    var wikiFolderNameInput = $('wiki-folder-name-input');
+    if (wikiFolderNameInput) {
+      wikiFolderNameInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (wikiCreateFolderBtn) wikiCreateFolderBtn.click();
+        }
+      });
+    }
+
     // -- Editor toolbar --
     var editorBoldBtn = $('editor-bold-btn');
     if (editorBoldBtn) editorBoldBtn.addEventListener('click', function () { Editor.applyFormat('bold'); });
@@ -2054,40 +2533,6 @@
       themeToggle.addEventListener('click', function () {
         syncDarkMode(!document.body.classList.contains('dark-theme'));
       });
-    }
-
-    // -- Cached layout elements (static, queried once) --
-    var _layout = {
-      main:     $('main-content'),
-      sidebar:  $('sidebar'),
-      footer:   $('app-footer'),
-      settings: $('settings-view'),
-      api:      $('api-docs-view')
-    };
-    var _panelIconsCreated = {};
-
-    /** Show the normal file-browser layout, hiding any overlay panel. */
-    function restoreMainLayout() {
-      if (_layout.settings) _layout.settings.hidden = true;
-      if (_layout.api)      _layout.api.hidden = true;
-      if (_layout.main)     _layout.main.hidden = false;
-      if (_layout.sidebar)  _layout.sidebar.hidden = false;
-      if (_layout.footer)   _layout.footer.hidden = false;
-    }
-
-    /** Show a full-screen overlay panel (settings or api), hiding the main layout. */
-    function showPanel(name) {
-      if (_layout.main)     _layout.main.hidden = true;
-      if (_layout.sidebar)  _layout.sidebar.hidden = true;
-      if (_layout.footer)   _layout.footer.hidden = true;
-      if (_layout.settings) _layout.settings.hidden = (name !== 'settings');
-      if (_layout.api)      _layout.api.hidden = (name !== 'api');
-      // Create lucide icons only once per panel (they're static HTML)
-      var panel = _layout[name];
-      if (panel && !_panelIconsCreated[name]) {
-        lucide.createIcons({ nodes: [panel] });
-        _panelIconsCreated[name] = true;
-      }
     }
 
     // -- Settings --
@@ -2252,6 +2697,61 @@
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Layout Helpers (module-level, used by Router)
+  // ---------------------------------------------------------------------------
+
+  var _layout = null;
+  var _panelIconsCreated = {};
+
+  function _ensureLayout() {
+    if (!_layout) {
+      _layout = {
+        main:     $('main-content'),
+        sidebar:  $('sidebar'),
+        footer:   $('app-footer'),
+        settings: $('settings-view'),
+        api:      $('api-docs-view'),
+        wikiView: $('wiki-view')
+      };
+    }
+  }
+
+  function restoreMainLayout() {
+    _ensureLayout();
+    if (_layout.settings) _layout.settings.hidden = true;
+    if (_layout.api)      _layout.api.hidden = true;
+    if (_layout.wikiView) _layout.wikiView.hidden = true;
+    if (_layout.main)     _layout.main.hidden = false;
+    if (_layout.sidebar)  _layout.sidebar.hidden = false;
+    if (_layout.footer)   _layout.footer.hidden = false;
+    // Restore file browser elements if coming from wiki
+    var fileBrowser = $('file-browser');
+    var toolbar = $('toolbar');
+    var breadcrumbBar = $('breadcrumb-bar');
+    if (fileBrowser) fileBrowser.hidden = false;
+    if (toolbar) toolbar.hidden = false;
+    if (breadcrumbBar) breadcrumbBar.hidden = false;
+  }
+
+  function showPanel(name) {
+    _ensureLayout();
+    if (_layout.main)     _layout.main.hidden = true;
+    if (_layout.sidebar)  _layout.sidebar.hidden = true;
+    if (_layout.footer)   _layout.footer.hidden = true;
+    if (_layout.settings) _layout.settings.hidden = (name !== 'settings');
+    if (_layout.api)      _layout.api.hidden = (name !== 'api');
+    var panel = _layout[name];
+    if (panel && !_panelIconsCreated[name]) {
+      lucide.createIcons({ nodes: [panel] });
+      _panelIconsCreated[name] = true;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Router
+  // ---------------------------------------------------------------------------
+
   var Router = {
     /** Parse current hash into a route object */
     parse() {
@@ -2259,6 +2759,8 @@
       if (!hash) return { type: 'root' };
       if (hash === 'settings') return { type: 'settings' };
       if (hash === 'api') return { type: 'api' };
+      if (hash === 'wiki') return { type: 'wiki' };
+      if (hash.indexOf('wiki/') === 0) return { type: 'wiki-page', slug: hash.substring(5) };
       if (hash.indexOf('s/') === 0) return { type: 'share', token: hash.substring(2) };
       if (hash.indexOf('d/') === 0) return { type: 'document', slug: hash.substring(2) };
       if (hash.indexOf('f/') === 0) return { type: 'folder', path: hash.substring(2) };
@@ -2294,6 +2796,20 @@
         case 'settings':
         case 'api': {
           showPanel(route.type);
+          return;
+        }
+
+        case 'wiki': {
+          restoreMainLayout();
+          Wiki._showWikiLayout();
+          Wiki.showHome();
+          return;
+        }
+
+        case 'wiki-page': {
+          restoreMainLayout();
+          Wiki._showWikiLayout();
+          Wiki.openPageBySlug(route.slug);
           return;
         }
 
@@ -2468,10 +2984,88 @@
         }
       }
 
+      // Seed wiki pages
+      if (meta.wikiPages) {
+        var wikiFolderMap = {};
+        for (var w = 0; w < meta.wikiPages.length; w++) {
+          var wp = meta.wikiPages[w];
+          if (wp.type === 'folder') {
+            var wfId = crypto.randomUUID();
+            wikiFolderMap[wp.id] = wfId;
+            await Storage.saveFile({
+              id: wfId, name: wp.title, slug: wp.slug, type: 'folder',
+              mimeType: null, size: 0, wikiPage: true,
+              parentId: wp.parentId ? wikiFolderMap[wp.parentId] : null,
+              shared: false, deleted: false
+            }, null);
+          } else {
+            try {
+              var wResp = await fetch(base + wp.filePath);
+              if (!wResp.ok) continue;
+              var wBuffer = await wResp.arrayBuffer();
+              await Storage.saveFile({
+                id: crypto.randomUUID(), name: wp.title, slug: wp.slug,
+                type: 'file', mimeType: 'text/markdown', size: wBuffer.byteLength,
+                wikiPage: true,
+                parentId: wp.parentId ? wikiFolderMap[wp.parentId] : null,
+                shared: false, deleted: false
+              }, wBuffer);
+            } catch (wErr) {
+              console.warn('Failed to fetch wiki page: ' + wp.filePath, wErr);
+            }
+          }
+        }
+      }
+
       UI.showToast('Demo-Projekt geladen: ' + meta.project.name, 'success');
     } catch (err) {
       console.error('Seed failed:', err);
       UI.showToast('Demo-Daten konnten nicht geladen werden', 'error');
+    }
+  }
+
+  /** Seed wiki pages independently (for users who already had demo data). */
+  async function seedWikiData() {
+    if (localStorage.getItem('opendocs-wiki-seeded')) return;
+    // Check if wiki pages already exist (seeded by seedDemoData)
+    var existing = await Storage.listAllWikiItems();
+    if (existing.length > 0) {
+      localStorage.setItem('opendocs-wiki-seeded', '1');
+      return;
+    }
+    var meta = await Metadata.load();
+    if (!meta || !meta.wikiPages) return;
+    localStorage.setItem('opendocs-wiki-seeded', '1');
+
+    var base = 'demo-files/';
+    var wikiFolderMap = {};
+    for (var w = 0; w < meta.wikiPages.length; w++) {
+      var wp = meta.wikiPages[w];
+      if (wp.type === 'folder') {
+        var wfId = crypto.randomUUID();
+        wikiFolderMap[wp.id] = wfId;
+        await Storage.saveFile({
+          id: wfId, name: wp.title, slug: wp.slug, type: 'folder',
+          mimeType: null, size: 0, wikiPage: true,
+          parentId: wp.parentId ? wikiFolderMap[wp.parentId] : null,
+          shared: false, deleted: false
+        }, null);
+      } else {
+        try {
+          var wResp = await fetch(base + wp.filePath);
+          if (!wResp.ok) continue;
+          var wBuffer = await wResp.arrayBuffer();
+          await Storage.saveFile({
+            id: crypto.randomUUID(), name: wp.title, slug: wp.slug,
+            type: 'file', mimeType: 'text/markdown', size: wBuffer.byteLength,
+            wikiPage: true,
+            parentId: wp.parentId ? wikiFolderMap[wp.parentId] : null,
+            shared: false, deleted: false
+          }, wBuffer);
+        } catch (wErr) {
+          console.warn('Failed to fetch wiki page: ' + wp.filePath, wErr);
+        }
+      }
     }
   }
 
@@ -2480,6 +3074,7 @@
     init();
     await Metadata.load();
     await seedDemoData();
+    await seedWikiData();
 
     // Handle initial route or render default
     var route = Router.parse();
@@ -2489,6 +3084,7 @@
 
     UI.renderFileList();
     UI.updateStorageBar();
+    Wiki.renderTree();
 
     // Listen for hash changes
     window.addEventListener('hashchange', function () {

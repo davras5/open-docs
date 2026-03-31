@@ -927,5 +927,13 @@
       ],
       "tags": ["Projektmanagement", "Kontakte"]
     }
+  ],
+  "wikiPages": [
+    { "id": "wp-home",       "title": "Projekt-Wiki",          "slug": "home",        "fileName": "home.md",       "filePath": "wiki/home.md",                "parentId": null },
+    { "id": "wp-bauablauf",  "title": "Bauablauf",             "slug": "bauablauf",   "fileName": "bauablauf.md",  "filePath": "wiki/bauablauf.md",           "parentId": null },
+    { "id": "wp-sicherheit", "title": "Sicherheitskonzept",    "slug": "sicherheit",  "fileName": "sicherheit.md", "filePath": "wiki/sicherheit.md",          "parentId": null },
+    { "id": "wf-materialien","title": "Materialien",           "slug": "materialien", "type": "folder",            "parentId": null },
+    { "id": "wp-beton",      "title": "Betonspezifikationen",  "slug": "beton",       "fileName": "beton.md",      "filePath": "wiki/materialien/beton.md",   "parentId": "wf-materialien" },
+    { "id": "wp-holz",       "title": "Holzbau",               "slug": "holz",        "fileName": "holz.md",       "filePath": "wiki/materialien/holz.md",    "parentId": "wf-materialien" }
   ]
 }

@@ -16,6 +16,9 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js" integrity="sha384-QCIdq2UMVEoSRhR3ZWZwdz2/pivLowr+eokFMdYyukq7qI26VYRxFa4Nl6FKetmL" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js"></script>
 </head>
 <body>
 
@@ -97,6 +100,22 @@
           </li>
         </ul>
       </nav>
+
+      <!-- Wiki tree (always visible in sidebar) -->
+      <div class="wiki-tree-container" id="wiki-tree-container">
+        <div class="wiki-tree-header">
+          <span class="wiki-tree-title">Pages</span>
+          <div class="wiki-tree-actions">
+            <button class="icon-btn" id="wiki-new-page-btn" type="button" title="New Page">
+              <i data-lucide="file-plus"></i>
+            </button>
+            <button class="icon-btn" id="wiki-new-folder-btn" type="button" title="New Folder">
+              <i data-lucide="folder-plus"></i>
+            </button>
+          </div>
+        </div>
+        <div class="wiki-tree" id="wiki-tree"></div>
+      </div>
 
       <div class="sidebar-footer">
         <div class="storage-info">
@@ -181,6 +200,30 @@
           <p class="empty-state-text">Drop files here or click Upload</p>
         </div>
         <!-- File/folder items are rendered here by JS -->
+      </section>
+
+      <!-- Wiki Page View -->
+      <section class="wiki-view" id="wiki-view" hidden>
+        <div class="wiki-page-header" id="wiki-page-header">
+          <h1 class="wiki-page-title" id="wiki-page-title"></h1>
+          <div class="wiki-page-actions">
+            <button class="btn btn-primary" id="wiki-edit-btn" type="button">
+              <i data-lucide="pencil"></i>
+              <span>Edit</span>
+            </button>
+          </div>
+        </div>
+        <div class="wiki-page-content" id="wiki-page-content"></div>
+        <div class="wiki-editor-wrapper" id="wiki-editor-wrapper" hidden>
+          <textarea id="wiki-editor-textarea"></textarea>
+          <div class="wiki-editor-actions">
+            <button class="btn btn-primary" id="wiki-save-btn" type="button">
+              <i data-lucide="save"></i>
+              <span>Save</span>
+            </button>
+            <button class="btn btn-secondary" id="wiki-cancel-btn" type="button">Cancel</button>
+          </div>
+        </div>
       </section>
 
     </main>
@@ -694,6 +737,46 @@
         aria-multiline="true"
         aria-label="Document editor"
       ></div>
+    </div>
+  </div>
+
+  <!-- ========== WIKI PAGE MODAL ========== -->
+  <div class="modal-overlay" id="wiki-page-modal" role="dialog" aria-modal="true" aria-labelledby="wiki-page-modal-title" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="wiki-page-modal-title">New Wiki Page</h2>
+        <button class="icon-btn modal-close" data-modal-close="wiki-page-modal" type="button" aria-label="Close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <label for="wiki-page-name-input" class="input-label">Page title</label>
+        <input type="text" id="wiki-page-name-input" class="text-input" placeholder="Untitled Page" autofocus>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-modal-close="wiki-page-modal" type="button">Cancel</button>
+        <button class="btn btn-primary" id="wiki-create-page-btn" type="button">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== WIKI FOLDER MODAL ========== -->
+  <div class="modal-overlay" id="wiki-folder-modal" role="dialog" aria-modal="true" aria-labelledby="wiki-folder-modal-title" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="wiki-folder-modal-title">New Wiki Folder</h2>
+        <button class="icon-btn modal-close" data-modal-close="wiki-folder-modal" type="button" aria-label="Close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <label for="wiki-folder-name-input" class="input-label">Folder name</label>
+        <input type="text" id="wiki-folder-name-input" class="text-input" placeholder="New Folder" autofocus>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-modal-close="wiki-folder-modal" type="button">Cancel</button>
+        <button class="btn btn-primary" id="wiki-create-folder-btn" type="button">Create</button>
+      </div>
     </div>
   </div>
 
