@@ -986,6 +986,19 @@
 
   var Editor = {
     currentFileId: null,
+    quillInstance: null,
+
+    /** Initialize or re-use the Quill editor for the DOCX editor modal. */
+    _initQuill() {
+      if (this.quillInstance) return;
+      if (typeof Quill === 'undefined') return;
+      this.quillInstance = new Quill('#editor-quill-editor', {
+        theme: 'snow',
+        modules: {
+          toolbar: '#editor-quill-toolbar'
+        }
+      });
+    },
 
     /** Open the editor modal, loading DOCX content as HTML. */
     async open(fileId) {
@@ -1000,28 +1013,30 @@
         var title = $('editor-modal-title');
         if (title) title.textContent = 'Edit: ' + meta.name;
 
-        // Convert DOCX to HTML
-        var editorContent = $('editor-content');
+        UI.openModal('editor-modal');
+        this._initQuill();
+
+        // Convert DOCX to HTML and load into Quill
+        var html = '';
         if (typeof mammoth !== 'undefined') {
           var result = await mammoth.convertToHtml({ arrayBuffer: data });
-          editorContent.innerHTML = sanitizeHTML(result.value);
+          html = result.value;
         } else {
-          // Fallback: try to render as text
-          editorContent.innerHTML = '<p>' + new TextDecoder().decode(data) + '</p>';
+          html = '<p>' + new TextDecoder().decode(data) + '</p>';
         }
 
-        UI.openModal('editor-modal');
+        if (this.quillInstance) {
+          this.quillInstance.root.innerHTML = html;
+        }
       } catch (err) {
         console.error('Editor open failed:', err);
         UI.showToast('Failed to open editor', 'error');
       }
     },
 
-    /** Save the current editor HTML content back to storage.
-     *  WARNING: This replaces the original .docx binary with HTML.
-     *  A backup of the original is stored under key 'backup-{id}'. */
+    /** Save the current editor HTML content back to storage. */
     async save() {
-      if (!this.currentFileId) return;
+      if (!this.currentFileId || !this.quillInstance) return;
       if (!confirm('Saving will convert this document to HTML format. The original .docx formatting may be lost. Continue?')) return;
       try {
         // Backup original binary before overwriting (one-time)
@@ -1032,8 +1047,7 @@
           if (original) await dataStore.setItem(backupKey, original);
         }
 
-        var editorContent = $('editor-content');
-        var html = editorContent.innerHTML;
+        var html = this.quillInstance.root.innerHTML;
         var encoder = new TextEncoder();
         var buffer = encoder.encode(html).buffer;
         await dataStore.setItem(this.currentFileId, buffer);
@@ -1046,14 +1060,12 @@
       }
     },
 
-    /** Apply a formatting command (bold, italic, underline). */
-    applyFormat(command) {
-      document.execCommand(command, false, null);
-    },
-
     /** Close the editor modal. */
     close() {
       this.currentFileId = null;
+      if (this.quillInstance) {
+        this.quillInstance.root.innerHTML = '';
+      }
       UI.closeModal('editor-modal');
     }
   };
@@ -1067,7 +1079,7 @@
     editorInstance: null,
     isEditing: false,
     treeExpandedFolders: JSON.parse(localStorage.getItem('opendocs-wiki-expanded') || '[]'),
-    _currentMarkdown: '',
+    _currentHtml: '',
 
     /** Show wiki layout in main content (hide file browser, show wiki view). */
     _showWikiLayout() {
@@ -1256,13 +1268,16 @@
       var wikiView = $('wiki-view');
       if (wikiView) wikiView.hidden = false;
 
-      // Load markdown content
+      // Load content (may be markdown or HTML)
       var data = await Storage.getData(pageId);
-      var markdown = '';
+      var rawContent = '';
       if (data) {
-        markdown = new TextDecoder().decode(data);
+        rawContent = new TextDecoder().decode(data);
       }
-      this._currentMarkdown = markdown;
+
+      // Detect legacy markdown and convert to HTML for display
+      var htmlContent = this._contentToHtml(rawContent);
+      this._currentHtml = htmlContent;
 
       // Render page
       var header = $('wiki-page-header');
@@ -1274,7 +1289,7 @@
       if (title) title.textContent = meta.name;
       if (content) {
         content.hidden = false;
-        content.innerHTML = this.renderMarkdown(markdown);
+        content.innerHTML = htmlContent;
       }
       if (editorWrapper) editorWrapper.hidden = true;
 
@@ -1282,43 +1297,43 @@
       this.renderTree();
     },
 
-    /** Render markdown to HTML using marked (bundled with EasyMDE) or fallback. */
-    renderMarkdown(md) {
+    /** Convert content to HTML. Detects markdown (legacy) vs HTML. */
+    _contentToHtml(content) {
+      if (!content) return '';
+      // If content looks like HTML (starts with a tag), use as-is
+      var trimmed = content.trim();
+      if (trimmed.charAt(0) === '<') return content;
+      // Otherwise treat as legacy markdown and convert
       if (typeof marked !== 'undefined') {
-        return marked.parse(md);
+        return marked.parse(content);
       }
-      // Fallback: use Viewer's basic renderer
-      return Viewer._renderMarkdown(md);
+      return Viewer._renderMarkdown(content);
     },
 
-    /** Switch to edit mode. */
+    /** Switch to edit mode using Quill. */
     startEditing() {
       if (!this.currentPageId) return;
       this.isEditing = true;
 
       var content = $('wiki-page-content');
       var editorWrapper = $('wiki-editor-wrapper');
-      var textarea = $('wiki-editor-textarea');
 
       if (content) content.hidden = true;
       if (editorWrapper) editorWrapper.hidden = false;
-      if (textarea) textarea.value = this._currentMarkdown;
 
-      // Initialize EasyMDE
-      if (typeof EasyMDE !== 'undefined' && !this.editorInstance) {
-        this.editorInstance = new EasyMDE({
-          element: textarea,
-          initialValue: this._currentMarkdown,
-          spellChecker: false,
-          autosave: { enabled: false },
-          toolbar: ['bold', 'italic', 'heading', '|', 'unordered-list', 'ordered-list', '|',
-                    'link', 'image', 'table', '|', 'code', 'quote', 'horizontal-rule', '|',
-                    'preview', 'side-by-side', '|', 'guide'],
-          sideBySideFullscreen: false,
-          status: false,
-          minHeight: '400px',
-          previewClass: ['editor-preview', 'wiki-page-content']
+      // Initialize Quill
+      if (typeof Quill !== 'undefined' && !this.editorInstance) {
+        this.editorInstance = new Quill('#wiki-quill-editor', {
+          theme: 'snow',
+          modules: {
+            toolbar: '#wiki-quill-toolbar'
+          }
         });
+      }
+
+      // Load current HTML into Quill
+      if (this.editorInstance) {
+        this.editorInstance.root.innerHTML = this._currentHtml || '';
       }
     },
 
@@ -1333,13 +1348,13 @@
       if (editorWrapper) editorWrapper.hidden = true;
     },
 
-    /** Save the current page. */
+    /** Save the current page (now stored as HTML). */
     async savePage() {
       if (!this.currentPageId || !this.editorInstance) return;
 
-      var markdown = this.editorInstance.value();
+      var html = this.editorInstance.root.innerHTML;
       var encoder = new TextEncoder();
-      var buffer = encoder.encode(markdown).buffer;
+      var buffer = encoder.encode(html).buffer;
 
       await dataStore.setItem(this.currentPageId, buffer);
       await Storage.updateFile(this.currentPageId, {
@@ -1348,21 +1363,25 @@
       });
 
       UI.showToast('Page saved', 'success');
-      this._currentMarkdown = markdown;
+      this._currentHtml = html;
       this.cancelEditing();
 
       // Re-render the page
       var content = $('wiki-page-content');
       if (content) {
-        content.innerHTML = this.renderMarkdown(markdown);
+        content.innerHTML = html;
       }
     },
 
-    /** Destroy the EasyMDE editor instance. */
+    /** Destroy the Quill editor instance. */
     destroyEditor() {
       if (this.editorInstance) {
-        this.editorInstance.toTextArea();
+        // Quill doesn't have a destroy method — clear and nullify
+        this.editorInstance.root.innerHTML = '';
         this.editorInstance = null;
+        // Remove Quill's generated internal elements so next init is clean
+        var editorEl = $('wiki-quill-editor');
+        if (editorEl) editorEl.className = '';
       }
     },
 
@@ -1379,7 +1398,7 @@
       }
 
       var id = crypto.randomUUID();
-      var defaultContent = '# ' + title + '\n\nStart writing here...\n';
+      var defaultContent = '<h1>' + title + '</h1><p>Start writing here...</p>';
       var encoder = new TextEncoder();
       var buffer = encoder.encode(defaultContent).buffer;
 
@@ -2169,8 +2188,9 @@
     if (viewerEditBtn) {
       viewerEditBtn.addEventListener('click', function () {
         if (Viewer.currentFile) {
+          var fileId = Viewer.currentFile.id;
           Viewer.close();
-          Editor.open(Viewer.currentFile.id);
+          Editor.open(fileId);
         }
       });
     }
@@ -2487,14 +2507,7 @@
       });
     }
 
-    // -- Editor toolbar --
-    var editorBoldBtn = $('editor-bold-btn');
-    if (editorBoldBtn) editorBoldBtn.addEventListener('click', function () { Editor.applyFormat('bold'); });
-    var editorItalicBtn = $('editor-italic-btn');
-    if (editorItalicBtn) editorItalicBtn.addEventListener('click', function () { Editor.applyFormat('italic'); });
-    var editorUnderlineBtn = $('editor-underline-btn');
-    if (editorUnderlineBtn) editorUnderlineBtn.addEventListener('click', function () { Editor.applyFormat('underline'); });
-
+    // -- Editor save/close (toolbar is handled by Quill) --
     var editorSaveBtn = $('editor-save-btn');
     if (editorSaveBtn) editorSaveBtn.addEventListener('click', function () { Editor.save(); });
     var editorCloseBtn = $('editor-close-btn');

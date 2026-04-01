@@ -17,8 +17,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
 </head>
 <body>
 
@@ -215,7 +215,36 @@
         </div>
         <div class="wiki-page-content" id="wiki-page-content"></div>
         <div class="wiki-editor-wrapper" id="wiki-editor-wrapper" hidden>
-          <textarea id="wiki-editor-textarea"></textarea>
+          <div id="wiki-quill-toolbar">
+            <span class="ql-formats">
+              <select class="ql-header">
+                <option value="1">Heading 1</option>
+                <option value="2">Heading 2</option>
+                <option value="3">Heading 3</option>
+                <option selected>Normal</option>
+              </select>
+            </span>
+            <span class="ql-formats">
+              <button class="ql-bold"></button>
+              <button class="ql-italic"></button>
+              <button class="ql-underline"></button>
+              <button class="ql-strike"></button>
+            </span>
+            <span class="ql-formats">
+              <button class="ql-list" value="ordered"></button>
+              <button class="ql-list" value="bullet"></button>
+              <button class="ql-blockquote"></button>
+              <button class="ql-code-block"></button>
+            </span>
+            <span class="ql-formats">
+              <button class="ql-link"></button>
+              <button class="ql-image"></button>
+            </span>
+            <span class="ql-formats">
+              <button class="ql-clean"></button>
+            </span>
+          </div>
+          <div id="wiki-quill-editor"></div>
           <div class="wiki-editor-actions">
             <button class="btn btn-primary" id="wiki-save-btn" type="button">
               <i data-lucide="save"></i>
@@ -706,17 +735,6 @@
     <div class="editor-modal">
       <div class="editor-header">
         <h2 class="editor-title" id="editor-modal-title">Edit Document</h2>
-        <div class="editor-toolbar" id="editor-toolbar">
-          <button class="icon-btn" id="editor-bold-btn" type="button" aria-label="Bold" title="Bold">
-            <i data-lucide="bold"></i>
-          </button>
-          <button class="icon-btn" id="editor-italic-btn" type="button" aria-label="Italic" title="Italic">
-            <i data-lucide="italic"></i>
-          </button>
-          <button class="icon-btn" id="editor-underline-btn" type="button" aria-label="Underline" title="Underline">
-            <i data-lucide="underline"></i>
-          </button>
-        </div>
         <div class="editor-actions">
           <button class="btn btn-primary" id="editor-save-btn" type="button">
             <i data-lucide="save"></i>
@@ -729,14 +747,45 @@
         </div>
       </div>
 
-      <div
-        class="editor-content"
-        id="editor-content"
-        contenteditable="true"
-        role="textbox"
-        aria-multiline="true"
-        aria-label="Document editor"
-      ></div>
+      <div id="editor-quill-toolbar">
+        <span class="ql-formats">
+          <select class="ql-header">
+            <option value="1">Heading 1</option>
+            <option value="2">Heading 2</option>
+            <option value="3">Heading 3</option>
+            <option selected>Normal</option>
+          </select>
+          <select class="ql-font"></select>
+          <select class="ql-size"></select>
+        </span>
+        <span class="ql-formats">
+          <button class="ql-bold"></button>
+          <button class="ql-italic"></button>
+          <button class="ql-underline"></button>
+          <button class="ql-strike"></button>
+        </span>
+        <span class="ql-formats">
+          <select class="ql-color"></select>
+          <select class="ql-background"></select>
+        </span>
+        <span class="ql-formats">
+          <button class="ql-list" value="ordered"></button>
+          <button class="ql-list" value="bullet"></button>
+          <select class="ql-align"></select>
+        </span>
+        <span class="ql-formats">
+          <button class="ql-blockquote"></button>
+          <button class="ql-code-block"></button>
+        </span>
+        <span class="ql-formats">
+          <button class="ql-link"></button>
+          <button class="ql-image"></button>
+        </span>
+        <span class="ql-formats">
+          <button class="ql-clean"></button>
+        </span>
+      </div>
+      <div id="editor-quill-editor" role="textbox" aria-multiline="true" aria-label="Document editor"></div>
     </div>
   </div>
 
