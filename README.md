@@ -273,22 +273,19 @@ OpenDocs today runs entirely in the browser. The next step is a backend API that
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
-  'primaryColor': '#4A90D9',
-  'lineColor': '#888',
+  'primaryColor': '#93C5FD',
+  'lineColor': '#999',
   'textColor': '#1a1a2e',
-  'cScale0': '#3B82F6',
-  'cScale1': '#8B5CF6',
-  'cScale2': '#F97316',
-  'cScale3': '#14B8A6',
-  'cScale4': '#6366F1',
-  'cScale5': '#EAB308',
-  'cScale6': '#EC4899',
-  'cScale7': '#06B6D4',
-  'cScale8': '#EF4444',
-  'cScale9': '#84CC16',
-  'cScalePeer1': '#fff', 'cScalePeer2': '#fff', 'cScalePeer3': '#fff',
-  'cScalePeer4': '#fff', 'cScalePeer5': '#fff', 'cScalePeer6': '#fff',
-  'cScalePeer7': '#fff', 'cScalePeer8': '#fff', 'cScalePeer9': '#fff'
+  'cScale0': '#93C5FD',
+  'cScale1': '#C4B5FD',
+  'cScale2': '#FDBA74',
+  'cScale3': '#5EEAD4',
+  'cScale4': '#A5B4FC',
+  'cScale5': '#FDE047',
+  'cScale6': '#F9A8D4',
+  'cScale7': '#67E8F9',
+  'cScale8': '#FCA5A5',
+  'cScale9': '#BEF264'
 }}}%%
 mindmap
   root((OpenDocs API))
