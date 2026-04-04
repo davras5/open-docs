@@ -3228,3 +3228,158 @@ textarea:focus-visible {
     width: 100%;
   }
 }
+
+/* ──────────────────────────────────────────────
+   IFC 3D Viewer
+   ────────────────────────────────────────────── */
+.ifc-viewer-wrapper {
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  position: relative;
+}
+
+.ifc-viewer-wrapper canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Status overlay */
+.ifc-status {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.ifc-status-loading {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.ifc-status-success {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.ifc-status-error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.ifc-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(147, 197, 253, 0.3);
+  border-top-color: #93c5fd;
+  border-radius: 50%;
+  animation: ifc-spin 0.8s linear infinite;
+}
+
+@keyframes ifc-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Properties panel */
+.ifc-prop-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 280px;
+  max-height: calc(100% - 24px);
+  background: rgba(30, 30, 50, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ifc-prop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.ifc-prop-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.ifc-prop-close:hover {
+  color: #ef4444;
+}
+
+.ifc-prop-body {
+  padding: 12px 14px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.ifc-prop-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #e0e7ff;
+  margin-bottom: 4px;
+}
+
+.ifc-prop-type {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+.ifc-prop-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ifc-prop-key {
+  color: rgba(255, 255, 255, 0.45);
+  flex-shrink: 0;
+}
+
+.ifc-prop-val {
+  color: #e2e8f0;
+  font-weight: 500;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 150px;
+  padding-left: 8px;
+}

@@ -37,8 +37,9 @@ It runs entirely as static files (HTML + CSS + JS) and can be deployed on **GitH
 ## Key Features
 
 - **File browser** with grid and list views, folders, breadcrumb navigation, drag-and-drop upload
-- **In-browser document preview** for 8+ file formats (see [Supported Formats](#supported-formats))
+- **In-browser document preview** for 9+ file formats (see [Supported Formats](#supported-formats))
 - **DWG/DXF CAD viewer** with pan, zoom, and full entity rendering via LibreDWG WASM
+- **IFC 3D BIM viewer** with orbit controls, element picking, and property inspection via Three.js + web-ifc
 - **Confluence-style document viewer** with dark overlay, left/right navigation, and image zoom
 - **Document metadata** following Dublin Core and construction standards (see [Metadata](#metadata-architecture))
 - **URL routing** with shareable links for folders and documents (`/#/d/projektbeschrieb`, `/#/s/pB7xK2`)
@@ -62,6 +63,7 @@ graph TB
         Styles["style.css — Components"]
         App["app.js — Core Application"]
         DWG["dwg-viewer.js — CAD Viewer"]
+        IFC["ifc-viewer.js — IFC 3D Viewer"]
     end
 
     subgraph "Storage Layer"
@@ -85,8 +87,10 @@ graph TB
     App --> Meta
     App --> Files
     App --> DWG
+    App --> IFC
     App --> LF & Mammoth & SheetJS & PDFJS
     DWG --> LibreDWG
+    IFC --> ThreeJS["Three.js 0.155 + web-ifc (WASM)"]
     UI --> Lucide
 ```
 
@@ -127,7 +131,8 @@ open-docs/
 │   └── style.css           # Component styles
 ├── js/
 │   ├── app.js              # Core application logic
-│   └── dwg-viewer.js       # Standalone DWG/DXF CAD viewer
+│   ├── dwg-viewer.js       # Standalone DWG/DXF CAD viewer
+│   └── ifc-viewer.js       # IFC 3D BIM viewer (Three.js + web-ifc)
 ├── data/
 │   └── metadata.json       # Document metadata database
 ├── demo-files/             # Static demo files (Swiss construction project)
@@ -157,6 +162,7 @@ open-docs/
 | **.xlsx** (Excel) | [SheetJS](https://sheetjs.com/) | First sheet as HTML table with headers |
 | **.pdf** | [PDF.js](https://mozilla.github.io/pdf.js/) | All pages rendered to canvas, scrollable |
 | **.dwg / .dxf** (AutoCAD) | [LibreDWG-Web](https://github.com/nicholasgasior/libredwg-web) (WASM) | Full 2D rendering with 20+ entity types, pan/zoom |
+| **.ifc** (BIM) | [Three.js](https://threejs.org/) + [web-ifc](https://github.com/ThatOpen/engine_web-ifc) (WASM) | 3D orbit viewer with element picking & properties |
 | **.jpg .png .gif .svg .webp** | Native browser | Zoom (scroll, double-click, drag-to-pan) |
 | **.md** (Markdown) | Built-in renderer | Headings, tables, lists, code blocks, bold/italic |
 | **.txt .json .csv .js .html .css .xml** | Native TextDecoder | Monospace preformatted text |
@@ -261,6 +267,84 @@ Built on a **CSS custom property token system** (`css/tokens.css`):
 
 ---
 
+## API Vision
+
+OpenDocs today runs entirely in the browser. The next step is a backend API that turns it into a real multi-user platform. Inspired by [BIMData's modular API architecture](https://developers.bimdata.io/api/introduction/overview.html) but focused on what construction clients (Bauherr) actually need: **finding, viewing, and sharing documents** -- not deep BIM tooling.
+
+```mermaid
+mindmap
+  root((OpenDocs API))
+    **Documents API**
+      Upload & download
+      CRUD with metadata
+      Version history & diff
+      Bulk operations
+      Tags & classification
+      Dublin Core / SIA fields
+    **Processing API**
+      Office to PDF conversion
+      Thumbnail generation
+      Full-text extraction
+      DWG/DXF to SVG
+      IFC to glTF
+      OCR for scanned PDFs
+    **Projects API**
+      Project hierarchy
+      Folder structure
+      Project templates
+      Multi-tenant isolation
+      SIA phase tracking
+    **Auth API**
+      OAuth2 / OIDC
+        Azure AD
+        Keycloak
+      Role-based access
+        Project roles
+        Folder permissions
+        Document-level ACL
+      API keys for integrations
+    **Collaboration API**
+      Share links & tokens
+      Comments & threads
+      Approval workflows
+      Activity feed
+      Notifications
+        Email
+        Webhooks
+        In-app
+    **Search API**
+      Full-text search
+      Metadata filters
+      Tag-based queries
+      Faceted results
+      Saved searches
+    **Storage API**
+      Pluggable backends
+        S3 / MinIO
+        Azure Blob
+        WebDAV
+        Local filesystem
+      Streaming upload
+      Signed download URLs
+    **Sync API**
+      Desktop folder sync
+      Offline-first queue
+      Conflict resolution
+      Office plugin bridge
+```
+
+### Design Principles for the API
+
+| Principle | Rationale |
+|-----------|-----------|
+| **Document-first, not model-first** | Clients work with Office files daily; BIM/CAD is occasional. The API optimizes for the common case. |
+| **Processing as a service** | Heavy conversions (IFC to glTF, DWG to SVG, Office to PDF) happen server-side. The frontend gets web-ready output. |
+| **Progressive complexity** | Simple use cases (upload, view, share) require 2-3 endpoints. Advanced features (workflows, sync) are opt-in modules. |
+| **Standards over invention** | Dublin Core for metadata, OAuth2 for auth, S3-compatible for storage, webhooks for events. No proprietary protocols. |
+| **Offline-capable by design** | The current client-only architecture is a feature, not a limitation. The API adds multi-user sync without removing offline capability. |
+
+---
+
 ## Roadmap
 
 ### Currently Missing
@@ -286,7 +370,7 @@ Built on a **CSS custom property token system** (`css/tokens.css`):
 | Automatic metadata extraction | Medium | Parse Office metadata, classify by content |
 | RAG (Retrieval-Augmented Generation) | High | Vector embeddings of documents for LLM-powered Q&A |
 | Live collaborative editing | Very High | CRDT (Yjs) or OT; requires WebSocket server |
-| IFC viewer (BIM models) | High | Server-side conversion for large files; IFC.js / Three.js |
+| IFC viewer (BIM models) | ~~High~~ Done | Client-side via Three.js + web-ifc; server-side conversion needed for large files |
 | Point cloud viewer (.las/.laz) | High | Potree; needs backend tiling for large scans |
 | 360-degree photo viewer | Medium | Pannellum; feasible client-side |
 | Office tool plugins | Medium | Microsoft 365 / Google Workspace add-ins |
@@ -318,6 +402,7 @@ Built on a **CSS custom property token system** (`css/tokens.css`):
 | Excel preview | [SheetJS](https://sheetjs.com/) 0.20.1 |
 | PDF preview | [PDF.js](https://mozilla.github.io/pdf.js/) 3.11.174 |
 | CAD preview | [LibreDWG-Web](https://github.com/nicholasgasior/libredwg-web) 0.6.6 (WASM) |
+| BIM preview | [Three.js](https://threejs.org/) 0.155 + [web-ifc](https://github.com/ThatOpen/engine_web-ifc) 0.0.66 (WASM) |
 | Design system | CSS custom properties (tokens.css) |
 | Deployment | GitHub Pages (static files) |
 

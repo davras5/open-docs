@@ -193,6 +193,40 @@
       "level": "EG"
     },
     {
+      "id": "doc-005b",
+      "folderId": "f-planung",
+      "fileName": "BIM_Modell_EG.ifc",
+      "filePath": "01 Planung/BIM_Modell_EG.ifc",
+      "slug": "bim-modell-eg",
+      "shareToken": "bM3iK8",
+      "title": "BIM-Modell Erdgeschoss",
+      "creator": "Arch. ETH Laura Brunner",
+      "description": "3D-BIM-Modell des Erdgeschosses mit Wänden, Decken, Türen, Fenstern und Stütze. IFC2x3 Coordination View.",
+      "type": "BIM-Modell",
+      "language": "de-CH",
+      "rights": "Vertraulich",
+      "discipline": "Architektur",
+      "phase": "32 Bauprojekt",
+      "revision": "1.0",
+      "status": "In Arbeit",
+      "format": "application/x-step",
+      "size": 7459,
+      "createdAt": "2026-03-15T10:00:00Z",
+      "modifiedAt": "2026-03-15T10:00:00Z",
+      "createdBy": "brunner@be-arch.ch",
+      "modifiedBy": "brunner@be-arch.ch",
+      "shared": true,
+      "sharedWith": [
+        { "email": "m.keller@implenia.com", "permission": "view", "name": "Marco Keller" },
+        { "email": "wyss@schnetzer-puskas.ch", "permission": "view", "name": "Thomas Wyss" }
+      ],
+      "version": 1,
+      "versions": [
+        { "version": 1, "date": "2026-03-15T10:00:00Z", "author": "brunner@be-arch.ch", "comment": "Erstversion BIM-Modell EG" }
+      ],
+      "tags": ["Planung", "BIM", "IFC", "Erdgeschoss", "3D-Modell"]
+    },
+    {
       "id": "doc-006",
       "folderId": "f-planung",
       "fileName": "Fassade_Detail.dwg",

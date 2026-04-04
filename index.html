@@ -19,6 +19,20 @@
   <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+
+  <!-- IFC Viewer: Import Map for ES Module dependencies -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/",
+        "three/examples/jsm/utils/BufferGeometryUtils": "https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/utils/BufferGeometryUtils.js",
+        "three-mesh-bvh": "https://unpkg.com/three-mesh-bvh@0.5.23/build/index.module.js",
+        "web-ifc": "https://unpkg.com/web-ifc@0.0.66/web-ifc-api.js",
+        "web-ifc-three": "https://unpkg.com/web-ifc-three@0.0.126/IFCLoader.js"
+      }
+    }
+  </script>
 </head>
 <body>
 
@@ -851,6 +865,9 @@
 
   <!-- DWG/DXF Viewer -->
   <script src="js/dwg-viewer.js"></script>
+
+  <!-- IFC 3D Viewer (ES Module — exposes window.IfcViewer) -->
+  <script type="module" src="js/ifc-viewer.js"></script>
 
   <!-- App Logic -->
   <script src="js/app.js"></script>

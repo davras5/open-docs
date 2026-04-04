@@ -48,6 +48,8 @@
       // CAD
       dwg:  { icon: 'ruler', color: '#0D47A1', category: 'cad' },
       dxf:  { icon: 'ruler', color: '#0D47A1', category: 'cad' },
+      // BIM
+      ifc:  { icon: 'box', color: '#00695C', category: 'bim' },
       // Archives
       zip:  { icon: 'file-archive', color: '#FFA000', category: 'archive' },
       rar:  { icon: 'file-archive', color: '#FFA000', category: 'archive' },
@@ -1510,6 +1512,7 @@
       content.classList.remove('viewer-content-media');
       this._destroyZoom();
       if (typeof DwgViewer !== 'undefined') DwgViewer.cleanup();
+      if (typeof IfcViewer !== 'undefined') IfcViewer.cleanup();
       modal.hidden = false;
       lucide.createIcons({ nodes: [content] });
 
@@ -1541,12 +1544,14 @@
         var data = await Storage.getData(file.id);
         var ft = getFileType(file.name);
 
-        // Images and CAD render directly on dark bg, no white paper
-        if (ft.category === 'image' || ft.category === 'cad') {
+        // Images, CAD, and BIM render directly on dark bg, no white paper
+        if (ft.category === 'image' || ft.category === 'cad' || ft.category === 'bim') {
           content.classList.add('viewer-content-media');
         }
 
-        if (ft.category === 'cad') {
+        if (ft.category === 'bim') {
+          await this.renderIfc(data, content, file.name);
+        } else if (ft.category === 'cad') {
           await this.renderDwg(data, content, file.name);
         } else if (ft.category === 'document') {
           await this.renderDocx(data, content);
@@ -1579,6 +1584,7 @@
       this.currentIndex = -1;
       this._destroyZoom();
       if (typeof DwgViewer !== 'undefined') DwgViewer.cleanup();
+      if (typeof IfcViewer !== 'undefined') IfcViewer.cleanup();
       var infoPanel = $('viewer-info-panel');
       if (infoPanel) infoPanel.hidden = true;
     },
@@ -1787,6 +1793,19 @@
       container.style.width = '100%';
       container.style.height = '100%';
       await DwgViewer.render(arrayBuffer, container, fileName);
+    },
+
+    async renderIfc(arrayBuffer, container, fileName) {
+      if (typeof IfcViewer === 'undefined') {
+        container.innerHTML = '<div class="preview-unsupported"><h3>IFC viewer not loaded</h3><p>The IFC 3D viewer library could not be loaded. Please try refreshing the page.</p></div>';
+        return;
+      }
+      container.innerHTML = '';
+      container.style.padding = '0';
+      container.style.maxWidth = 'none';
+      container.style.width = '100%';
+      container.style.height = '100%';
+      await IfcViewer.render(arrayBuffer, container, fileName);
     },
 
     renderImage(arrayBuffer, mimeType, container) {
@@ -2966,7 +2985,8 @@
         xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         pdf: 'application/pdf', svg: 'image/svg+xml', md: 'text/markdown',
         csv: 'text/csv', txt: 'text/plain', jpg: 'image/jpeg', jpeg: 'image/jpeg',
-        png: 'image/png', dwg: 'application/acad', dxf: 'application/dxf'
+        png: 'image/png', dwg: 'application/acad', dxf: 'application/dxf',
+        ifc: 'application/x-step'
       };
 
       var total = meta.documents.length;
