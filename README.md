@@ -269,7 +269,7 @@ Built on a **CSS custom property token system** (`css/tokens.css`):
 
 ## API Vision
 
-OpenDocs today runs entirely in the browser. The next step is a backend API that turns it into a real multi-user platform. Inspired by [BIMData's modular API architecture](https://developers.bimdata.io/api/introduction/overview.html) but focused on what project stakeholders actually need: **finding, viewing, and sharing documents** -- not deep BIM tooling.
+OpenDocs today runs entirely in the browser. The next step is a backend API that turns it into a real multi-user platform -- focused on what project stakeholders actually need: **finding, viewing, and sharing documents.**
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
@@ -355,58 +355,6 @@ mindmap
       Desktop folder sync
       Offline-first with conflict resolution
 ```
-
-### Critical Review
-
-Two expert perspectives on what matters most and what's missing.
-
-**Senior Backend Developer** -- *"What do I build first, and what will break if I get it wrong?"*
-
-> **The 5 most important API functions**, in build order:
->
-> 1. **`POST /documents` (upload with async processing)** -- This is the entry point for everything. Upload must accept the file, return immediately with a document ID, and kick off a processing pipeline (thumbnail, text extraction, format conversion) via the job queue. If this endpoint is slow or unreliable, nothing else matters. Get multipart upload with resumability right from day one -- large files over flaky connections are the norm, not the edge case.
->
-> 2. **`GET /documents/:id/content` (signed URL download)** -- Don't stream files through the API server. Generate a time-limited signed URL to the storage backend and redirect. This keeps the API server stateless and lets the CDN/storage handle bandwidth. The Processing API feeds into this: when a client requests a PDF view of a .docx, the API checks if a processed version exists, returns it, or triggers conversion and returns a 202 with a polling URL.
->
-> 3. **`POST /indexing/enrich` (on-upload enrichment pipeline)** -- This fires automatically after upload. Extract text, run OCR if needed, pull metadata from file properties, generate embeddings, auto-suggest tags. The critical design decision: this must be **idempotent and retriable**. Files will fail to parse, OCR will timeout, LLM calls will 429. Every step must be independently retriable without re-running the whole pipeline. Use a state machine per document (uploaded -> extracting -> embedding -> enriched -> failed), not a single "processing" flag.
->
-> 4. **`GET /search` (unified search)** -- One endpoint that searches full-text content, metadata fields, tags, and semantic embeddings in a single query. Don't make the frontend call three different search backends. Internally, fan out to Elasticsearch/Meilisearch for text and Postgres for metadata, merge and rank results. Faceted filtering (by project, phase, document type, date range) is not optional -- it's how people actually narrow down results.
->
-> 5. **`POST /relations` (create typed link)** -- This is what makes OpenDocs more than a file server. Simple to implement (it's essentially an edge table), but the data model matters: `{source_id, target_id, type, metadata, created_by, auto_discovered}`. The `auto_discovered` flag distinguishes human-created links from ML-suggested ones. Bi-directional queries (`GET /documents/:id/relations`) must be fast -- this will be called on every document open.
->
-> **What's missing from the mind map:**
->
-> - **Events API.** The audit trail is buried inside Collaboration, but it's foundational infrastructure. Every state change (upload, view, download, share, approve, delete) should emit an immutable event to a log. The activity feed, audit trail, webhooks, and indexing triggers all consume from this same event stream. Without it, you'll have audit logic scattered across every module. Make it a first-class API: `GET /events?document_id=X&type=viewed&since=2026-01-01`.
->
-> - **Health / Jobs API.** The Processing and Indexing pipelines are async. Clients need `GET /jobs/:id` to poll status, and admins need `GET /jobs?status=failed` to monitor the queue. Without this, failed conversions become silent black holes -- a document shows "processing" forever and nobody knows why.
->
-> - **Trash / Soft delete.** The Documents API says "CRUD" but doesn't call out soft delete. In document management, hard delete is almost never what you want. Documents should move to trash, stay recoverable for a configurable period, then get purged. This interacts with retention policies -- some documents legally *cannot* be deleted even if a user tries.
->
-> **Architecture warning:** The mind map has 11 modules. Don't build 11 services. Start with 3 deployable units: **(1)** Core API (Documents, Projects, Auth, Collaboration, Relations, Search -- all backed by one Postgres database), **(2)** Processing Worker (job queue consumer for file conversion, thumbnail generation), **(3)** Indexing Worker (text extraction, embedding generation, enrichment). Split further only when you have real scaling bottlenecks.
-
-**Document Management / CDE Expert** -- *"What will an enterprise buyer or compliance auditor ask for?"*
-
-> **The 5 most important capabilities**, ranked by deal-breaker risk:
->
-> 1. **Configurable metadata schemas with validation.** Every organization has different required fields. The API needs `GET/PUT /projects/:id/schema` to define which metadata fields are required, optional, or auto-filled for each document type within a project. Without this, the system is either too rigid (hardcoded fields nobody uses) or too loose (everything is optional, nothing is findable). The Indexing API's auto-enrichment is powerful, but it must respect the schema -- suggested values should pre-fill the required fields, and validation should block uploads with missing mandatory metadata.
->
-> 2. **Formal revision control with status workflow.** The Documents API says "version history" but doesn't distinguish between a minor save (version) and a formal issue (revision). The API needs: `POST /documents/:id/revisions` to create a formal revision (Rev. A, B, C), separate from the automatic version history on every save. Each revision needs a status field with configurable transitions: Draft -> For Review -> Approved -> Superseded. The approval workflow in Collaboration should drive these transitions. This is the core of any CDE -- without it, you're just a file share with extra steps.
->
-> 3. **Complete audit trail with export.** Not just "who changed what" but "who viewed what, when, from which IP, and what did they do with it." Compliance auditors need `GET /audit?document_id=X&format=csv` to pull a complete access history. Every document download, view, share, metadata change, and permission change must be logged immutably. This cannot be an afterthought bolted onto the Collaboration API -- it needs to be a cross-cutting concern captured at the API gateway level.
->
-> 4. **Granular, inheritable permissions.** The Auth API lists "project roles, folder permissions, document-level ACL" but doesn't mention inheritance. In practice: a project has a default permission set, folders inherit from the project but can override, documents inherit from their folder but can override. The API needs `GET /documents/:id/effective-permissions` that resolves the full inheritance chain. Without inheritance, admins spend all day setting permissions manually. Without overrides, you can't restrict sensitive documents within an otherwise open folder.
->
-> 5. **Controlled external sharing with expiry and watermarking.** Share links are listed, but enterprise use requires: expiry dates, view-only (no download) mode, dynamic watermarking on PDFs (viewer's email stamped on every page), download logging, and the ability to revoke a link instantly. `POST /shares` with `{document_id, expires_at, allow_download: false, watermark: true}`. This is often the single feature that determines whether legal/compliance approves the platform.
->
-> **What's missing from the mind map:**
->
-> - **Templates & naming conventions.** In regulated environments, documents must follow naming rules (e.g., `[ProjectCode]-[Phase]-[Discipline]-[Type]-[Rev]`). The API should enforce this: `PUT /projects/:id/naming-rules` with pattern validation on upload. Auto-enrichment can suggest the name; validation can reject non-compliant uploads. Without this, the folder structure degrades into chaos within weeks.
->
-> - **Distribution / transmittal management.** When a set of documents is formally sent to an external party (contractor, authority, client), that act needs to be recorded as a transmittal: which documents, which revision, to whom, when, with acknowledgment tracking. This is a first-class workflow in construction and engineering, not just "sharing." `POST /transmittals` with `{documents: [...], recipients: [...], due_date, cover_note}`.
->
-> - **Document comparison / diff.** The Documents API lists "version history & diff" but this deserves emphasis. The ability to compare two revisions of a PDF or Word document visually (redline view) is a daily workflow. The Processing API should support `GET /documents/:id/compare?rev_a=A&rev_b=B` returning a visual diff. This is hard to build but extremely high-value.
->
-> **Overall assessment:** The mind map covers the right territory. The biggest structural gap is that **Events/Audit** should be a top-level module, not a line item under Collaboration. The second gap is that **revision control with status workflow** is the most important single feature for CDE buyers and it's currently implicit rather than explicit in the Documents API. Make those two changes and the architecture is solid.
 
 ---
 
