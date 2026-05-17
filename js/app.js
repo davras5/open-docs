@@ -2929,7 +2929,6 @@
 
   async function seedDemoData() {
     if (localStorage.getItem('opendocs-seeded')) return;
-    localStorage.setItem('opendocs-seeded', '1');
 
     // Show loading indicator in the file browser
     var emptyState = $('empty-state');
@@ -3050,6 +3049,7 @@
         }
       }
 
+      localStorage.setItem('opendocs-seeded', '1');
       UI.showToast('Demo-Projekt geladen: ' + meta.project.name, 'success');
     } catch (err) {
       console.error('Seed failed:', err);
